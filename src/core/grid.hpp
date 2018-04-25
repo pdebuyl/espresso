@@ -47,7 +47,6 @@
 #include "communication.hpp"
 #include "utils.hpp"
 #include "errorhandling.hpp"
-#include "lees_edwards.hpp"
 
 #include <climits>
 
@@ -66,17 +65,8 @@
 extern int node_grid[3];
 /** position of node in node grid */
 extern int node_pos[3];
-#ifdef LEES_EDWARDS
-/** the nearest neighbors of a node in the node grid. */
-extern int *node_neighbors;
-extern int *node_neighbor_lr;
-extern int *node_neighbor_wrap;
-/** the number of nearest neighbors of a node in the node grid. */
-extern int my_neighbor_count;
-#else
 /** the six nearest neighbors of a node in the node grid. */
 extern int node_neighbors[6];
-#endif
 /** where to fold particles that leave local box in direction i. */
 extern int boundary[6];
 /** Flags for all three dimensions wether pbc are applied (default).
@@ -239,19 +229,6 @@ inline void fold_coordinate(double pos[3], double vel[3], int image_box[3],
       return;
     }
 
-#ifdef LEES_EDWARDS
-    if (dir == 1) {
-      /* must image y and v_x at same time as x */
-      pos[0] -= (lees_edwards_offset * img_count);
-      vel[0] -= (lees_edwards_rate * img_count);
-
-      /* (re)-image x */
-      img_count = (int)floor(pos[0] * box_l_i[0]);
-      image_box[0] += img_count;
-      pos[0] = pos[0] - img_count * box_l[0];
-    }
-
-#endif
   }
 }
 
@@ -331,18 +308,6 @@ inline void fold_position(Vector3d &pos, Vector<3, int> &image_box) {
     afterwards.
 */
 inline void unfold_position(double pos[3], double vel[3], int image_box[3]) {
-#ifdef LEES_EDWARDS
-  auto const y_img_count = static_cast<int>(floor(pos[1] * box_l_i[1] + image_box[1]));
-
-  pos[0] += image_box[0] * box_l[0] + y_img_count * lees_edwards_offset;
-  pos[1] += image_box[1] * box_l[1];
-  pos[2] += image_box[2] * box_l[2];
-
-  vel[0] += y_img_count * lees_edwards_rate;
-
-  image_box[0] = image_box[1] = image_box[2] = 0;
-
-#else
 
   int i;
   for (i = 0; i < 3; i++) {
@@ -350,24 +315,14 @@ inline void unfold_position(double pos[3], double vel[3], int image_box[3]) {
     image_box[i] = 0;
   }
 
-#endif
 }
 
 template<typename Particle>
 Vector3d unfolded_position(const Particle * p) {
   Vector3d pos{p->r.p};
-#ifdef LEES_EDWARDS
-  auto const y_img_count = static_cast<int>(floor(pos[1] * box_l_i[1] + p->l.i[1]));
-
-  pos[0] += p->l.i[0] * box_l[0] + y_img_count * lees_edwards_offset;
-  pos[1] += p->l.i[1] * box_l[1];
-  pos[2] += p->l.i[2] * box_l[2];
-#else
   for (int i = 0; i < 3; i++) {
     pos[i] += p->l.i[i] * box_l[i];
   }
-
-#endif
 
   return pos;
 }

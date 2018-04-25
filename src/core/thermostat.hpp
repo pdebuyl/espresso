@@ -178,25 +178,6 @@ inline void thermo_convert_vel_space_to_body(Particle *p, double *vel_space,
 }
 #endif // ROTATION
 
-/** locally defined funcion to find Vx. In case of LEES_EDWARDS, that is
-   relative to the LE shear frame
-    @param i      coordinate index
-    @param vel    velocity vector
-    @param pos    position vector
-    @return       adjusted (or not) i^th velocity coordinate */
-inline double le_frameV(int i, double *vel, double *pos) {
-#ifdef LEES_EDWARDS
-
-  if (i == 0) {
-    double relY = pos[1] * box_l_i[1] - 0.5;
-    return (vel[0] - relY * lees_edwards_rate);
-  }
-
-#endif
-
-  return vel[i];
-}
-
 #ifdef NPT
 /** add velocity-dependend noise and friction for NpT-sims to the particle's
    velocity
@@ -275,8 +256,6 @@ inline void friction_thermo_langevin(Particle *p) {
     velocity[i] -= (p->swim.v_swim * time_step) * p->r.quatu[i];
 #endif
 
-    // Local effective velocity for leeds-edwards boundary conditions
-    velocity[i] = le_frameV(i, velocity, p->r.p);
   } // for
 
 // Determine prefactors for the friction and the noise term
