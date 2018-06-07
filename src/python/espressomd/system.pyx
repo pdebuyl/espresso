@@ -401,18 +401,18 @@ cdef class System(object):
     IF LEES_EDWARDS:
       property lees_edwards_protocol:
         def __set__(self, list _lees_edwards_protocol):
-          if str(_lees_edwards_protocol[0]) == "off" and len(_lees_edwards_protocol) == 1:
+          if str(_lees_edwards_protocol[0]) == str("off") and len(_lees_edwards_protocol) == 1:
             lees_edwards_function = _lees_edwards_protocol[0]
             #TODO: Set velocity to zero and fix current offset
-          if str(_lees_edwards_protocol[0]) == "stepstrain" and  len(_lees_edwards_protocol) == 2:
+          elif str(_lees_edwards_protocol[0]) == "stepstrain" and  len(_lees_edwards_protocol) == 2:
             lees_edwards_function = _lees_edwards_protocol[0]
             lees_edwards_offset = _lees_edwards_protocol[1]
             #TODO: Set offset to constant value
-          if str(_lees_edwards_protocol[0]) == "steady_shear" and len(_lees_edwards_protocol) == 2:
+          elif str(_lees_edwards_protocol[0]) == "steady_shear" and len(_lees_edwards_protocol) == 2:
             lees_edwards_function = _lees_edwards_protocol[0]
             lees_edwards_velocity = _lees_edwards_protocol[1]
             #TODO: Set velocity to constant value
-          if str(_lees_edwards_protocol[0]) == "oscillatory_shear" and len(_lees_edwards_protocol) == 3:
+          elif str(_lees_edwards_protocol[0]) == "oscillatory_shear" and len(_lees_edwards_protocol) == 3:
             lees_edwards_function =  _lees_edwards_protocol[0]
             lees_edwards_frequency = _lees_edwards_protocol[1]
             lees_edwards_amplitude = _lees_edwards_protocol[2]
