@@ -65,8 +65,16 @@ if VIRTUAL_SITES:
     setable_properties.append("_active_virtual_sites_handle")
 
 if LEES_EDWARDS == 1:
-    setable_properties.append("lees_edwards_protocol")
 
+  from enum import Enum
+
+  setable_properties.append("lees_edwards_protocol")
+
+  class LeesEdwardsFuntion(Enum):
+    off = 0
+    step_strain = 1
+    steady_shear = 2
+    oscilaltory_shear = 3
 
 cdef bool _system_created = False
 
@@ -399,6 +407,7 @@ cdef class System(object):
             return rng_state
 
     IF LEES_EDWARDS:
+      
       property lees_edwards_protocol:
         def __set__(self, list _lees_edwards_protocol):
           if str(_lees_edwards_protocol[0]) == str("off") and len(_lees_edwards_protocol) == 1:
