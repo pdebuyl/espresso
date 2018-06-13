@@ -74,7 +74,7 @@ if LEES_EDWARDS == 1:
     off = 0
     step_strain = 1
     steady_shear = 2
-    oscilaltory_shear = 3
+    oscillatory_shear = 3
 
 cdef bool _system_created = False
 
