@@ -64,6 +64,18 @@ setable_properties = ["box_l", "min_global_cut", "periodicity", "time",
 if VIRTUAL_SITES:
     setable_properties.append("_active_virtual_sites_handle")
 
+if LEES_EDWARDS == 1:
+
+  from enum import Enum
+
+  setable_properties.append("lees_edwards_protocol")
+
+  class LeesEdwardsFunction(Enum):
+    off = 0
+    step_strain = 1
+    steady_shear = 2
+    oscillatory_shear = 3
+
 cdef bool _system_created = False
 
 cdef class System(object):
@@ -393,6 +405,39 @@ cdef class System(object):
         def __get__(self):
             rng_state = list(map(int, (mpi_random_get_stat().c_str()).split()))
             return rng_state
+
+    IF LEES_EDWARDS:
+      
+      property lees_edwards_protocol:
+        def __set__(self, list _lees_edwards_protocol):
+          if str(_lees_edwards_protocol[0]) == str("off") and len(_lees_edwards_protocol) == 1:
+            lees_edwards_function = LeesEdwardsFunction.off
+            #TODO: Set velocity to zero and fix current offset
+          elif str(_lees_edwards_protocol[0]) == "step_strain" and  len(_lees_edwards_protocol) == 2:
+            lees_edwards_function = LeesEdwardsFunction.step_strain
+            lees_edwards_offset = _lees_edwards_protocol[1]
+            #TODO: Set offset to constant value
+          elif str(_lees_edwards_protocol[0]) == "steady_shear" and len(_lees_edwards_protocol) == 2:
+            lees_edwards_function = LeesEdwardsFunction.steady_shear
+            lees_edwards_velocity = _lees_edwards_protocol[1]
+            #TODO: Set velocity to constant value
+          elif str(_lees_edwards_protocol[0]) == "oscillatory_shear" and len(_lees_edwards_protocol) == 3:
+            lees_edwards_function =  LeesEdwardsFunction.oscillatory_shear
+            lees_edwards_frequency = _lees_edwards_protocol[1]
+            lees_edwards_amplitude = _lees_edwards_protocol[2]
+            #TODO: Set velocity and rate with sin and cos of \omega*t
+          else:
+            raise ValueError("The lees_edwards_protocol has to be either: off, steady_shear or oscillatory_shear. The number of additional arguments has to be 1 for steady shear or stepstrain and 2 for oscillatory shear.")
+
+    # This is a design question: Either the user provides the overall offset and amplitude, or the user provides the strain and rate. I think the first option is better because we cannot forsee as such if there will be a uniform rate in the box etc. Offset and velocity are the proper solution. #
+      #property lees_edwards_offset:
+      #  def __get__(self):
+      #    return lees_edwards_offset
+      #
+      #property lees_edwards_velocity:
+      #  def __get__(self):
+      #    return lees_edwards_velocity
+
 
     IF VIRTUAL_SITES:
         property virtual_sites:
