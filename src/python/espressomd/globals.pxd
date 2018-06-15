@@ -160,15 +160,19 @@ cdef extern from "swimmer_reaction.hpp":
 
     cdef extern reaction_struct reaction
 
-IF LEES_EDWARDS:
-    cdef extern from "lees_edwards.hpp":
-        double lees_edwards_offset
-        double lees_edwards_velocity
+cdef extern from "lees_edwards.hpp":
+    cdef enum LeesEdwardsProtocolType:
+        LEES_EDWARDS_PROTOCOL_OFF,
+        LEES_EDWARDS_PROTOCOL_STEP,
+        LEES_EDWARDS_PROTOCOL_STEADY_SHEAR,
+        LEES_EDWARDS_PROTOCOL_OSC_SHEAR
 
-    cdef extern from "lees_edwards.hpp":
-        cdef enum LeesEdwardsProtocolType:
-            LEES_EDWARDS_PROTOCOL_OFF,
-            LEES_EDWARDS_PROTOCOL_STEP,
-            LEES_EDWARDS_PROTOCOL_CST_SHEAR,
-            LEES_EDWARDS_PROTOCOL_OSC_SHEAR
+    ctypedef struct lees_edwards_protocol_struct:
+        LeesEdwardsProtocolType type
+        double time0
+        double offset
+        double velocity
+        double amplitude
+        double frequency
 
+    cdef extern lees_edwards_protocol_struct lees_edwards_protocol

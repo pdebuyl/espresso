@@ -1,23 +1,24 @@
-#ifdef LEES_EDWARDS
+#ifndef LEES_EDWARDS_H
+#define LEES_EDWARDS_H
 
 #include "config.hpp"
-
-extern double lees_edwards_offset;
-extern double lees_edwards_velocity;
 
 enum LeesEdwardsProtocolType {
     LEES_EDWARDS_PROTOCOL_OFF,
     LEES_EDWARDS_PROTOCOL_STEP,
-    LEES_EDWARDS_PROTOCOL_CST_SHEAR,
+    LEES_EDWARDS_PROTOCOL_STEADY_SHEAR,
     LEES_EDWARDS_PROTOCOL_OSC_SHEAR,
 };
 
-//typedef struct lees_edwards_protocol {
-//  char lees_edwards_funtion[];
-//  extern double lees_edwards_offset;
-//  extern double lees_edwards_velocity;
-//  double lees_edwards_amplitude;
-//  double lees_edwards_frequency;
-//  };
+typedef struct {
+  LeesEdwardsProtocolType type;
+  double time0;
+  double offset;
+  double velocity;
+  double amplitude;
+  double frequency;
+} lees_edwards_protocol_struct;
+
+extern lees_edwards_protocol_struct lees_edwards_protocol;
 
 #endif
