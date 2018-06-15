@@ -128,10 +128,6 @@ cdef extern from "rattle.hpp":
 cdef extern from "tuning.hpp":
     extern int timing_samples
 
-cdef extern from "lees_edwards.hpp":
-    double lees_edwards_offset
-    double lees_edwards_velocity
-
 cdef extern from "grid.hpp":
     double box_l[3]
     double local_box_l[3]
@@ -163,3 +159,16 @@ cdef extern from "swimmer_reaction.hpp":
         int swap
 
     cdef extern reaction_struct reaction
+
+IF LEES_EDWARDS:
+    cdef extern from "lees_edwards.hpp":
+        double lees_edwards_offset
+        double lees_edwards_velocity
+
+    cdef extern from "lees_edwards.hpp":
+        cdef enum LeesEdwardsProtocolType:
+            LEES_EDWARDS_PROTOCOL_OFF,
+            LEES_EDWARDS_PROTOCOL_STEP,
+            LEES_EDWARDS_PROTOCOL_CST_SHEAR,
+            LEES_EDWARDS_PROTOCOL_OSC_SHEAR
+
