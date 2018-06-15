@@ -282,7 +282,7 @@ Lees-Edwards boundary conditions impose a shear flow of speed :math:`\dot\gamma`
 
 :math:`v_{\text{x, unfolded}}` refers to the velocity of a particle outside the main simulation box, :math:`y_{\text{imagecount}}` is the amount of periodic boundaries crossed in the  :math:`y`-direction. 
 
-The Lees-Edwards boundary conditions support 4 different protocols: (1) 'step', (2) 'steady_shear', (3) 'oscillatory_shear', and (4) 'off'
+The Lees-Edwards boundary conditions support 4 different protocols: (1) 'step', (2) 'steady_shear', (3) 'oscillatory_shear', and (4) 'off'.
 
 They can be set via the Lees-Edwards function: 
 
