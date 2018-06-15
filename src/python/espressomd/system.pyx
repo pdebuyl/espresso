@@ -420,6 +420,8 @@ cdef class System(object):
           else:
             raise ValueError("The lees_edwards has to be either: off, step, steady_shear or oscillatory_shear. See the documentation for the arguments.")
 
+          mpi_bcast_parameter(FIELD_LEES_EDWARDS)
+
         def __get__(self):
             if lees_edwards_protocol.type == LEES_EDWARDS_PROTOCOL_OFF:
                 return ['off']

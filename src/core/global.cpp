@@ -36,6 +36,7 @@
 #include "thermalized_bond.hpp"
 #include "tuning.hpp"
 #include "utils/mpi/all_compare.hpp"
+#include "lees_edwards.hpp"
 
 #include <boost/functional/hash.hpp>
 
@@ -86,6 +87,12 @@ const std::unordered_map<int, Datafield> fields{
       {langevin_gamma.data(), Datafield::Type::DOUBLE, 3, "gamma",
        1}}, /* 5  from thermostat.cpp */
 #endif // PARTICLE_ANISOTROPY
+#ifdef LEES_EDWARDS
+     {FIELD_LEES_EDWARDS,
+     //TODO Send correct struct to all nodes
+     {&lees_edwards_protocol, Datafield::Type::DOUBLE, 1, "lees_edwards",
+       2}}, /* 6  from lees_edwards.cpp */
+#endif
      {FIELD_INTEG_SWITCH,
       {&integ_switch, Datafield::Type::INT, 1, "integ_switch",
        1}}, /* 7  from integrate.cpp */

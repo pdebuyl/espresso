@@ -672,6 +672,10 @@ void on_parameter_change(int field) {
     /* Thermalized distance bonds needs ghost velocities */
     on_ghost_flags_change();
     break;
+#ifdef LEES_EDWARDS
+  case FIELD_LEES_EDWARDS:
+  break;
+#endif
   }
 }
 

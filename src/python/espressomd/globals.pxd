@@ -35,6 +35,7 @@ cdef extern from "global.hpp":
     int FIELD_THERMO_SWITCH
     int FIELD_TEMPERATURE
     int FIELD_LANGEVIN_GAMMA
+    int FIELD_LEES_EDWARDS
     IF ROTATION:
         int FIELD_LANGEVIN_GAMMA_ROTATION
     IF NPT:
