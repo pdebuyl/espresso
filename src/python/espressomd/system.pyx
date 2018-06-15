@@ -422,13 +422,13 @@ cdef class System(object):
 
         def __get__(self):
             if lees_edwards_protocol.type == LEES_EDWARDS_PROTOCOL_OFF:
-                return 'off'
+                return ['off']
             elif lees_edwards_protocol.type == LEES_EDWARDS_PROTOCOL_STEP:
-                return 'step', lees_edwards_protocol.offset
+                return ['step', lees_edwards_protocol.offset]
             elif lees_edwards_protocol.type == LEES_EDWARDS_PROTOCOL_STEADY_SHEAR:
-                return 'steady_shear', lees_edwards_protocol.velocity
+                return ['steady_shear', lees_edwards_protocol.velocity]
             elif lees_edwards_protocol.type == LEES_EDWARDS_PROTOCOL_OSC_SHEAR:
-                return 'oscillatory_shear', lees_edwards_protocol.frequency, lees_edwards_protocol.amplitude
+                return ['oscillatory_shear', lees_edwards_protocol.frequency, lees_edwards_protocol.amplitude]
 
 
     IF VIRTUAL_SITES:
