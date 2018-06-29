@@ -21,11 +21,4 @@ typedef struct {
 
 extern lees_edwards_protocol_struct lees_edwards_protocol;
 
-typedef struct {
-  double offset;
-  double velocity;
-} lees_edwards_state;
-
-extern lees_edwards_state lees_edwards_data;
-
 #endif

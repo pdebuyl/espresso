@@ -90,7 +90,7 @@ const std::unordered_map<int, Datafield> fields{
 #ifdef LEES_EDWARDS
      {FIELD_LEES_EDWARDS,
      //TODO Send correct struct to all nodes
-     {&lees_edwards_data, Datafield::Type::DOUBLE, 2, "lees_edwards_data",
+     {&lees_edwards_protocol, Datafield::Type::DOUBLE, 1, "lees_edwards",
        2}}, /* 6  from lees_edwards.cpp */
 #endif
      {FIELD_INTEG_SWITCH,
