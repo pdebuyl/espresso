@@ -200,6 +200,13 @@ extern int check_id;
 #define THERMO_TRACE(cmd)
 #endif
 
+#ifdef LEES_EDWARDS_DEBUG
+#define LEES_EDWARDS_TRACE(cmd)                                                \
+  { cmd; }
+#else
+#define LEES_EDWARDS_TRACE(cmd)
+#endif
+
 #ifdef LJ_DEBUG
 #define LJ_TRACE(cmd)                                                          \
   { cmd; }

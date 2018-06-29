@@ -52,6 +52,7 @@
 #include "interaction_data.hpp"
 #include "io/mpiio/mpiio.hpp"
 #include "lb.hpp"
+#include "lees_edwards.hpp"
 #include "lbboundaries.hpp"
 #include "lbboundaries/LBBoundary.hpp"
 #include "lj.hpp"
@@ -1186,6 +1187,14 @@ int mpi_integrate(int n_steps, int reuse_forces) {
 
 void mpi_integrate_slave(int n_steps, int reuse_forces) {
   integrate_vv(n_steps, reuse_forces);
+
+  LEES_EDWARDS_TRACE(printf("%d\n", lees_edwards_protocol.type))
+  LEES_EDWARDS_TRACE(printf("%f\n", lees_edwards_protocol.time0))
+  LEES_EDWARDS_TRACE(printf("%f\n", lees_edwards_protocol.offset))
+  LEES_EDWARDS_TRACE(printf("%f\n", lees_edwards_protocol.velocity))
+  LEES_EDWARDS_TRACE(printf("%f\n", lees_edwards_protocol.amplitude))
+  LEES_EDWARDS_TRACE(printf("%f\n", lees_edwards_protocol.frequency))
+
   COMM_TRACE(fprintf(
       stderr, "%d: integration for %d n_steps with %d reuse_forces done.\n",
       this_node, n_steps, reuse_forces));

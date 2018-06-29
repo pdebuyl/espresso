@@ -40,6 +40,7 @@
 #include "grid.hpp"
 #include "iccp3m.hpp" /* -iccp3m- */
 #include "lattice.hpp"
+#include "lees_edwards.hpp"
 #include "lb.hpp"
 #include "lbboundaries.hpp"
 #include "maggs.hpp"
@@ -68,6 +69,7 @@
 #include "thermalized_bond.hpp"
 #include "utils.hpp"
 #include "global.hpp"
+#include "mpi.h"
 #include "utils/mpi/all_compare.hpp" 
 /** whether the thermostat has to be reinitialized before integration */
 static int reinit_thermo = 1;
@@ -119,6 +121,24 @@ void on_program_start() {
   reaction.eq_rate = 0.0;
   reaction.sing_mult = 0;
   reaction.swap = 0;
+#endif
+
+#ifdef LEES_EDWARDS
+  lees_edwards_protocol.type = LEES_EDWARDS_PROTOCOL_OFF;
+  int le_count = 6;
+  int le_blocklengths[] = {1, 1, 1, 1, 1, 1};
+  MPI_Aint le_displacements[] = \
+    {offsetof(lees_edwards_protocol_struct, type),
+     offsetof(lees_edwards_protocol_struct, time0),
+     offsetof(lees_edwards_protocol_struct, offset),
+     offsetof(lees_edwards_protocol_struct, velocity),
+     offsetof(lees_edwards_protocol_struct, amplitude),
+     offsetof(lees_edwards_protocol_struct, frequency)} ;
+
+  MPI_Datatype le_types[] = {MPI_INT, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE};
+
+  MPI_Type_create_struct(le_count, le_blocklengths, le_displacements, le_types, &lees_edwards_mpi_data);
+  MPI_Type_commit(&lees_edwards_mpi_data);
 #endif
 
   /*
