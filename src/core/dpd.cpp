@@ -120,6 +120,19 @@ static double weight(int type, double r_cut, double dist_inv) {
   }
 }
 
+static Vector3d vel_diff(Vector3d const &x, Vector3d const &y,
+                         Vector3d const &u, Vector3d const &v) {
+  auto const sheer_rate = 0.5;
+  auto ret = u - v;
+
+  auto const dz = std::abs(x[2] - y[2]);
+  if(dz > 0.5 * box_l[2] ) {
+    ret[1] += Utils::sgn(dz) * sheer_rate;
+  }
+
+  return ret;
+}
+
 Vector3d dpd_pair_force(const Particle *p1, const Particle *p2, IA_parameters *ia_params,
                         double *d, double dist, double dist2) {
   Vector3d f{};
@@ -131,8 +144,9 @@ Vector3d dpd_pair_force(const Particle *p1, const Particle *p2, IA_parameters *i
     // DPD part
     // friction force prefactor
     double vel12_dot_d12 = 0.0;
+    auto const v12 = vel_diff(p1->r.p, p2->r.p, p1->m.v, p2->m.v);
     for (int j = 0; j < 3; j++)
-      vel12_dot_d12 += (p1->m.v[j] - p2->m.v[j]) * d[j];
+      vel12_dot_d12 += v12[j] * d[j];
     auto const friction = ia_params->dpd_pref1 * omega2 * vel12_dot_d12 * time_step;
     // random force prefactor
     double noise;
