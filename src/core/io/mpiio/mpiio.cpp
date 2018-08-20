@@ -127,18 +127,19 @@ static void dump_info(const std::string & fn, unsigned fields) {
   success = (fwrite(&fields, sizeof(fields), 1, f) == 1);
   // Pack the necessary information of bonded_ia_params:
   // The number of partners. This is needed to interpret the bond IntList.
-  if (n_bonded_ia > npartners.size())
-    npartners.resize(n_bonded_ia);
+  if (bonded_ia_params.size() > npartners.size())
+    npartners.resize(bonded_ia_params.size());
 
-  for (int i = 0; i < n_bonded_ia; ++i) {
+  for (int i = 0; i < bonded_ia_params.size(); ++i) {
     if (bonded_ia_params[i].type == BONDED_IA_NONE)
       npartners[i] = 0;
     else
       npartners[i] = bonded_ia_params[i].num;
   }
-  success = success && (fwrite(&n_bonded_ia, sizeof(int), 1, f) == 1);
-  success = success && (fwrite(npartners.data(), sizeof(int), n_bonded_ia, f) ==
-                        n_bonded_ia);
+  auto ia_params_size = static_cast<size_t>(bonded_ia_params.size());
+  success = success && (fwrite(&ia_params_size, sizeof(size_t), 1, f) == 1);
+  success = success && (fwrite(npartners.data(), sizeof(int), bonded_ia_params.size(), f) ==
+                        bonded_ia_params.size());
   fclose(f);
   if (!success) {
     fprintf(stderr, "MPI-IO Error: Failed to write %s.\n", fn.c_str());
@@ -182,9 +183,9 @@ void mpi_mpiio_common_write(const char *filename, unsigned fields) {
       pos[i3 + 2] = p.r.p[2];
     }
     if (fields & MPIIO_OUT_VEL) {
-      vel[i3] = p.m.v[0] / time_step;
-      vel[i3 + 1] = p.m.v[1] / time_step;
-      vel[i3 + 2] = p.m.v[2] / time_step;
+      vel[i3] = p.m.v[0];
+      vel[i3 + 1] = p.m.v[1];
+      vel[i3 + 2] = p.m.v[2];
     }
     if (fields & MPIIO_OUT_TYP) {
       type[i1] = p.p.type;
@@ -299,7 +300,7 @@ static void mpiio_read_array(const std::string & fn, T *arr, size_t len, size_t 
  * \param file Pointer to store the fields to
  */
 static void read_head(const std::string & fn, int rank, unsigned *fields) {
-  FILE *f;
+  FILE *f = nullptr;
   if (rank == 0) {
     if (!(f = fopen(fn.c_str(), "rb"))) {
       fprintf(stderr, "MPI-IO: Could not open %s.head.\n", fn.c_str());
@@ -313,6 +314,7 @@ static void read_head(const std::string & fn, int rank, unsigned *fields) {
   } else {
     MPI_Bcast(fields, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
   }
+  free(f);
 }
 
 /** Reads the pref file and fills pref and nlocalpart with their
@@ -418,7 +420,7 @@ void mpi_mpiio_common_read(const char *filename, unsigned fields) {
 
     for (int i = 0; i < nlocalpart; ++i)
       for (int k = 0; k < 3; ++k)
-        local_particles[id[i]]->m.v[k] = vel[3 * i + k] * time_step;
+        local_particles[id[i]]->m.v[k] = vel[3 * i + k];
   }
 
   if (fields & MPIIO_OUT_BND) {

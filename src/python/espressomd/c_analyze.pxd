@@ -37,7 +37,7 @@ cdef extern from "partCfg_global.hpp":
     PartCfg & partCfg()
 
 cdef extern from "particle_data.hpp":
-    int n_particle_types
+    int max_seen_particle_type
 
 cdef extern from "statistics.hpp":
     cdef void calc_structurefactor(PartCfg &, int * p_types, int n_types, int order, double ** sf)
@@ -96,9 +96,6 @@ cdef extern from "statistics_chain.hpp":
     void calc_rg(PartCfg&, double ** rg)
     void calc_rh(PartCfg&, double ** rh)
 
-cdef extern from "interaction_data.hpp":
-    int n_bonded_ia
-
 cdef extern from "statistics.hpp":
     void calc_rdf(PartCfg &, vector[int] p1_types, vector[int] p2_types,
                   double r_min, double r_max, int r_bins, vector[double] rdf)
@@ -107,7 +104,6 @@ cdef extern from "statistics.hpp":
                      double r_min, double r_max, int r_bins, vector[double] rdf, int n_conf)
 
     void angularmomentum(PartCfg &, int p_type, double * com)
-    void calc_gyration_tensor(PartCfg &, int p_type, vector[double] gt)
     void momentofinertiamatrix(PartCfg &, int p_type, double * MofImatrix)
     void analyze_rdfchain(PartCfg &, double r_min, double r_max, int r_bins, double ** f1, double ** f2, double ** f3)
 

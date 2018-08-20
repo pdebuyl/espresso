@@ -174,9 +174,6 @@ int map_3don2d_grid(int g3d[3], int g2d[3], int mult[3]);
 void rescale_boxl(int dir, double d_new);
 
 /** get the minimal distance vector of two vectors in the current bc.
-  *  \ref LEES_EDWARDS note: there is no need to add the le_offset here,
-  *  any offset should already have been added when the image particle was
- * prepared.
   *  @param a the vector to subtract from
   *  @param b the vector to subtract
   *  @param res where to store the result
@@ -184,11 +181,24 @@ void rescale_boxl(int dir, double d_new);
 
 template <typename T, typename U, typename V>
 inline void get_mi_vector(T &res, U const &a, V const &b) {
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
     res[i] = a[i] - b[i];
-    if (std::fabs(res[i]) > half_box_l[i] && PERIODIC(i))
-      res[i] -= dround(res[i] * box_l_i[i]) * box_l[i];
+
+  auto const dy = res[1];
+
+  for (int i = 0; i < 3; i++)
+    res[i] -= dround(res[i] * box_l_i[i]) * box_l[i];
+  
+  if (std::abs(dy) > half_box_l[1]) {
+    extern double sim_time;
+    auto const shear_rate = 0.5;
+    double const offset = sim_time * shear_rate;
+    //double const offset = 2.;
+    auto const shift =
+        Utils::sgn(dy) * (offset - dround(offset * box_l_i[1]) * box_l[1]);
+    res[0] -= shift;
   }
+    
 }
 
 template <typename T, typename U>
@@ -199,9 +209,7 @@ Vector3d get_mi_vector(T const &a, U const &b) {
   return res;
 }
 
-/** fold a coordinate to primary simulation box, including velocity (in case of
-   LEES_EDWARDS,
-    the velocity depends on the image we are in).
+/** fold a coordinate to primary simulation box, including velocity.
     \param pos         the position...
     \param vel         the velocity...
     \param image_box   and the box
@@ -211,8 +219,8 @@ Vector3d get_mi_vector(T const &a, U const &b) {
     Both pos and image_box are I/O,
     i. e. a previously folded position will be folded correctly.
 */
-inline void fold_coordinate(double pos[3], double vel[3], int image_box[3],
-                            int dir) {
+template <typename T1, typename T2, typename T3>
+void fold_coordinate(T1 &pos, T2 &vel, T3 &image_box, int dir) {
   if (PERIODIC(dir)) {
     int img_count = (int)floor(pos[dir] * box_l_i[dir]);
     image_box[dir] += img_count;
@@ -228,7 +236,6 @@ inline void fold_coordinate(double pos[3], double vel[3], int image_box[3],
       pos[dir] = 0;
       return;
     }
-
   }
 }
 
@@ -241,7 +248,8 @@ inline void fold_coordinate(double pos[3], double vel[3], int image_box[3],
     Both pos and image_box are I/O,
     i. e. a previously folded position will be folded correctly.
 */
-inline void fold_coordinate(double pos[3], int image_box[3], int dir) {
+template <typename T1, typename T2>
+void fold_coordinate(T1 &pos, T2 &image_box, int dir) {
   double v[3];
   fold_coordinate(pos, v, image_box, dir);
 }
@@ -254,7 +262,8 @@ inline void fold_coordinate(double pos[3], int image_box[3], int dir) {
     Pos, vel and image_box are I/O,
     i. e. a previously folded position will be folded correctly.
 */
-inline void fold_position(double pos[3], double vel[3], int image_box[3]) {
+template <typename T1, typename T2, typename T3>
+inline void fold_position(T1 &pos, T2 &vel, T3 &image_box) {
   for (int i = 0; i < 3; i++)
     fold_coordinate(pos, vel, image_box, i);
 }
@@ -266,7 +275,7 @@ inline void fold_position(double pos[3], double vel[3], int image_box[3]) {
     Both pos and image_box are I/O,
     i. e. a previously folded position will be folded correctly.
 */
-inline void fold_position(double pos[3], int image_box[3]) {
+template <typename T1, typename T2> void fold_position(T1 &pos, T2 &image_box) {
   for (int i = 0; i < 3; i++)
     fold_coordinate(pos, image_box, i);
 }
@@ -274,7 +283,7 @@ inline void fold_position(double pos[3], int image_box[3]) {
 /** fold particle coordinates to primary simulation box.
  * The particle is not changed.
  */
-template <typename Particle> Vector3d folded_position(Particle const &p) {
+inline Vector3d folded_position(Particle const &p) {
   Vector3d pos{p.r.p};
 
   for (int dir = 0; dir < 3; dir++) {
@@ -290,41 +299,40 @@ template <typename Particle> Vector3d folded_position(Particle const &p) {
 }
 
 /** @overload */
-template <typename Particle> Vector3d folded_position(const Particle *p) {
+inline Vector3d folded_position(const Particle *p) {
   assert(p);
   return folded_position(*p);
 }
 
-inline void fold_position(Vector3d &pos, Vector<3, int> &image_box) {
-  fold_position(pos.data(), image_box.data());
-}
-
 /** unfold coordinates to physical position.
     \param pos the position
-    \param pos the velocity
+    \param vel the velocity
     \param image_box and the box
 
     Both pos and image_box are I/O, i.e. image_box will be (0,0,0)
     afterwards.
 */
-inline void unfold_position(double pos[3], double vel[3], int image_box[3]) {
+template <typename T1, typename T2, typename T3>
+void unfold_position(T1 &pos, T2 &vel, T3 &image_box) {
 
   int i;
   for (i = 0; i < 3; i++) {
     pos[i] = pos[i] + image_box[i] * box_l[i];
     image_box[i] = 0;
   }
-
 }
 
-template<typename Particle>
-Vector3d unfolded_position(const Particle * p) {
+inline Vector3d unfolded_position(Particle const *p) {
   Vector3d pos{p->r.p};
   for (int i = 0; i < 3; i++) {
     pos[i] += p->l.i[i] * box_l[i];
   }
 
   return pos;
+}
+
+inline Vector3d unfolded_position(Particle const &p) {
+  return unfolded_position(&p);
 }
 
 /** unfold coordinates to physical position.
@@ -334,7 +342,8 @@ Vector3d unfolded_position(const Particle * p) {
     Both pos and image_box are I/O, i.e. image_box will be (0,0,0)
     afterwards.
 */
-inline void unfold_position(double pos[3], int image_box[3]) {
+template <typename T1, typename T2>
+void unfold_position(T1 &pos, T2 &image_box) {
   double v[3];
   unfold_position(pos, v, image_box);
 }

@@ -18,7 +18,6 @@
 #
 from __future__ import print_function
 import espressomd
-from espressomd import thermostat
 import numpy
 import unittest as ut
 from tests_common import abspath
@@ -42,7 +41,7 @@ class LennardJonesTest(ut.TestCase):
             cutoff=lj_cut, shift="auto")
 
         self.system.cell_system.skin = 0.4
-        self.system.time_step = 1.
+        self.system.time_step = .1
 
         for i in range(self.data.shape[0]):
             self.system.part.add(id=int(self.data[i][0]), pos=[self.data[i][1], self.data[i][2], self.data[i][3]])

@@ -103,27 +103,31 @@ bool validate_collision_parameters() {
   }
 #endif
 
-  // For vs based methods, Binding so far only works on a single cpu
-  //  if ((collision_params.mode & COLLISION_MODE_VS) ||(collision_params.mode &
-  //  COLLISION_MODE_GLUE_TO_SURF))
-  //    if (n_nodes != 1) {
-  //      runtimeErrorMsg() << "Virtual sites based collision modes only work on
-  //      a single node.";
-  //      return false;
-  //    }
-  //
+  if ((collision_params.mode != COLLISION_MODE_OFF) && (n_nodes>1)) {
+        runtimeErrorMsg() << "The collision detection schemes are currently not available in parallel simulations";
+        return false;
+  }
+  
   // Check if bonded ia exist
   if ((collision_params.mode & COLLISION_MODE_BOND) &&
-      (collision_params.bond_centers >= n_bonded_ia)) {
+      (collision_params.bond_centers >= bonded_ia_params.size())) {
     runtimeErrorMsg() << "The bond type to be used for binding particle "
                          "centers does not exist";
     return false;
   }
 
   if ((collision_params.mode & COLLISION_MODE_VS) &&
-      (collision_params.bond_vs >= n_bonded_ia)) {
+      (collision_params.bond_vs >= bonded_ia_params.size())) {
     runtimeErrorMsg()
         << "The bond type to be used for binding virtual sites does not exist";
+    return false;
+  }
+
+
+  if ((collision_params.mode & COLLISION_MODE_BOND) &&
+      collision_params.bond_centers == -1) {
+    runtimeErrorMsg() << "The bond_centers parameter is unknown. Did you add "
+                         "the interaction using system.bonded_inter.add?";
     return false;
   }
 
@@ -148,7 +152,7 @@ bool validate_collision_parameters() {
   if (collision_params.mode & COLLISION_MODE_BIND_THREE_PARTICLES) {
     if (collision_params.bond_three_particles +
             collision_params.three_particle_angle_resolution >
-        n_bonded_ia) {
+        bonded_ia_params.size()) {
       runtimeErrorMsg()
           << "Insufficient bonds defined for three particle binding.";
       return false;
@@ -228,7 +232,7 @@ void queue_collision(const int part1, const int part2) {
 /** @brief Calculate position of vs for GLUE_TO_SURFACE mode
 *    Reutnrs id of particle to bind vs to */
 int glue_to_surface_calc_vs_pos(const Particle *const p1,
-                                const Particle *const p2, double pos[3]) {
+                                const Particle *const p2, Vector3d& pos) {
   int bind_vs_to_pid;
   double vec21[3];
   double c;
@@ -255,7 +259,7 @@ int glue_to_surface_calc_vs_pos(const Particle *const p1,
 
 void bind_at_point_of_collision_calc_vs_pos(const Particle *const p1,
                                             const Particle *const p2,
-                                            double pos1[3], double pos2[3]) {
+                                            Vector3d& pos1, Vector3d& pos2) {
   double vec21[3];
   get_mi_vector(vec21, p1->r.p, p2->r.p);
   for (int i = 0; i < 3; i++) {
@@ -365,20 +369,20 @@ void coldet_do_three_particle_bond(Particle &p, Particle &p1, Particle &p2) {
 
 #ifdef VIRTUAL_SITES_RELATIVE
 void place_vs_and_relate_to_particle(const int current_vs_pid,
-                                     const double *const pos,
+                                     const Vector3d& pos,
                                      const int relate_to,
-                                     const double *const initial_pos) {
+                                     const Vector3d& initial_pos) {
 
   // The virtual site is placed at initial_pos which will be in the local
   // node's domain. It will then be moved to its final position.
   // A resort occurs after vs-based collisions anyway, which will move the vs
   // into the right cell.
   added_particle(current_vs_pid);
-  local_place_particle(current_vs_pid, initial_pos, 1);
-  memmove(local_particles[current_vs_pid]->r.p, pos, 3 * sizeof(double));
+  local_place_particle(current_vs_pid, initial_pos.data(), 1);
+  local_particles[current_vs_pid]->r.p=pos;
   local_vs_relate_to(current_vs_pid, relate_to);
 
-  (local_particles[max_seen_particle])->p.isVirtual = 1;
+  (local_particles[max_seen_particle])->p.is_virtual = 1;
   (local_particles[max_seen_particle])->p.type =
       collision_params.vs_particle_type;
 }
@@ -559,8 +563,8 @@ void three_particle_binding_domain_decomposition(
 
       Particle &p1 = *local_particles[c.pp1];
       Particle &p2 = *local_particles[c.pp2];
-      auto cell1 = cell_structure.position_to_cell(p1.r.p);
-      auto cell2 = cell_structure.position_to_cell(p2.r.p);
+      auto cell1 = cell_structure.position_to_cell(p1.r.p.data());
+      auto cell2 = cell_structure.position_to_cell(p2.r.p.data());
 
       three_particle_binding_dd_do_search(cell1, p1, p2);
       if (cell1 != cell2)
@@ -638,16 +642,16 @@ void handle_collisions() {
         // domain
         // Vs is moved afterwards and resorted after all collision s are handled
         // Use position of non-ghost colliding particle.
-        double initial_pos[3];
+        Vector3d initial_pos;
         if (p1->l.ghost)
-          memmove(initial_pos, p2->r.p, 3 * sizeof(double));
+          initial_pos = p2->r.p;
         else
-          memmove(initial_pos, p1->r.p, 3 * sizeof(double));
+          initial_pos= p1->r.p;
 
         // If we are in the two vs mode
         // Virtual site related to first particle in the collision
         if (collision_params.mode & COLLISION_MODE_VS) {
-          double pos1[3], pos2[3];
+          Vector3d pos1, pos2;
 
           // Enable rotation on the particles to which vs will be attached
           p1->p.rotation = ROTATION_X | ROTATION_Y | ROTATION_Z;
@@ -672,7 +676,7 @@ void handle_collisions() {
           }
         }
         if (collision_params.mode & COLLISION_MODE_GLUE_TO_SURF) {
-          double pos[3];
+          Vector3d pos;
           const int pid = glue_to_surface_calc_vs_pos(p1, p2, pos);
 
           // Change type of partilce being attached, to make it inert
@@ -702,6 +706,7 @@ void handle_collisions() {
       if (gathered_queue.size() > 0) {
         on_particle_change();
         announce_resort_particles();
+        cells_update_ghosts();
       }
     }  // total_collision>0
   }    // are we in one of the vs_based methods

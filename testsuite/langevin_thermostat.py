@@ -23,7 +23,7 @@ import espressomd
 import numpy as np
 from espressomd.interactions import FeneBond
 from time import time
-from espressomd.correlators import Correlator
+from espressomd.accumulators import Correlator
 from espressomd.observables import ParticleVelocities, ParticleBodyAngularVelocities
 
 @ut.skipIf(espressomd.has_features("THERMOSTAT_IGNORE_NON_VIRTUAL"),
@@ -274,22 +274,22 @@ class LangevinThermostat(ut.TestCase):
 
         # linear vel
         vel_obs=ParticleVelocities(ids=s.part[:].id)
-        corr_vel = Correlator(obs1=vel_obs, tau_lin=20, tau_max=1.9, dt=dt,
+        corr_vel = Correlator(obs1=vel_obs, tau_lin=20, tau_max=1.9, delta_N=1,
                 corr_operation="componentwise_product", compress1="discard1")
-        s.auto_update_correlators.add(corr_vel)
+        s.auto_update_accumulators.add(corr_vel)
         # angular vel
         if espressomd.has_features("ROTATION"):
             omega_obs=ParticleBodyAngularVelocities(ids=s.part[:].id)
-            corr_omega = Correlator(obs1=omega_obs, tau_lin=40, tau_max=3.9, dt=dt,
+            corr_omega = Correlator(obs1=omega_obs, tau_lin=40, tau_max=3.9, delta_N=1,
                     corr_operation="componentwise_product", compress1="discard1")
-            s.auto_update_correlators.add(corr_omega)
+            s.auto_update_accumulators.add(corr_omega)
         
-        s.integrator.run(300000)
+        s.integrator.run(400000)
         
-        s.auto_update_correlators.remove(corr_vel)
+        s.auto_update_accumulators.remove(corr_vel)
         corr_vel.finalize()
         if espressomd.has_features("ROTATION"):
-            s.auto_update_correlators.remove(corr_omega)
+            s.auto_update_accumulators.remove(corr_omega)
             corr_omega.finalize()
 
         # Verify diffusion
@@ -413,7 +413,27 @@ class LangevinThermostat(ut.TestCase):
                     self.assertAlmostEqual(s.part[0].omega_body[j],o0*np.exp(-gamma_r_i/rinertia[j]*s.time),places=2)
 
 
+    @ut.skipIf(not espressomd.has_features("VIRTUAL_SITES"), "Skipped for lack of VIRTUAL_SITES" )
+    def test_virtual(self):
+        s = self.s
+        s.time_step = 0.01
+        s.part.clear()
 
+        virtual = s.part.add(pos=[0,0,0], virtual=True, v=[1,0,0])
+        physical = s.part.add(pos=[0,0,0], virtual=False, v=[1,0,0])
+
+        s.thermostat.set_langevin(kT=0, gamma=1, gamma_rotation=1., act_on_virtual=False)
+
+        s.integrator.run(0)
+
+        np.testing.assert_almost_equal(np.copy(virtual.f), [0,0,0])
+        np.testing.assert_almost_equal(np.copy(physical.f), [-1,0,0])
+
+        s.thermostat.set_langevin(kT=0, gamma=1, gamma_rotation=1., act_on_virtual=True)
+        s.integrator.run(0)
+
+        np.testing.assert_almost_equal(np.copy(virtual.f), [-1,0,0])
+        np.testing.assert_almost_equal(np.copy(physical.f), [-1,0,0])
 
 if __name__ == "__main__":
     ut.main()

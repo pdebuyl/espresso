@@ -156,8 +156,8 @@ struct CellStructure {
   // Communicator for particle data used by ENGINE feature
   GhostCommunicator ghost_swimming_comm;
 #endif
-#ifdef IMMERSED_BOUNDARY
-  GhostCommunicator ibm_ghost_force_comm;
+#ifdef VIRTUAL_SITES_INERTIALESS_TRACERS
+  GhostCommunicator vs_inertialess_tracers_ghost_force_comm;
 #endif
 
   /** Cell system dependent function to find the right node for a
@@ -261,7 +261,7 @@ void cells_resort_particles(int global_flag);
     reorganization is due.
 
     @param flags a bitmask of CELL_FLAG_GRIDCHANGED,
-    CELL_FLAG_FAST, and/or CELL_FLAG_LEES_EDWARDS, see above.
+    and/or CELL_FLAG_FAST, see above.
 
 */
 void cells_on_geometry_change(int flags);

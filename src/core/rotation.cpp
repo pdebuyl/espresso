@@ -41,10 +41,11 @@
 #include "initialize.hpp"
 #include "integrate.hpp"
 #include "interaction_data.hpp"
-#include "p3m.hpp"
 #include "particle_data.hpp"
 #include "thermostat.hpp"
 #include "utils.hpp"
+#include "lb.hpp"
+
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -71,7 +72,7 @@ static void define_Qdd(Particle *p, double Qd[4], double Qdd[4], double S[3],
 
 /** convert quaternions to the director */
 /** Convert director to quaternions */
-int convert_quatu_to_quat(double d[3], double quat[4]) {
+int convert_quatu_to_quat(const Vector3d& d, Vector<4,double>& quat) {
   double d_xy, dm;
   double theta2, phi2;
 
@@ -292,7 +293,7 @@ void convert_torques_propagate_omega() {
 
     if (thermo_switch & THERMO_LANGEVIN) {
 #if defined(VIRTUAL_SITES) && defined(THERMOSTAT_IGNORE_NON_VIRTUAL)
-      if (!p.p.isVirtual)
+      if (!p.p.is_virtual)
 #endif
       {
         friction_thermo_langevin_rotation(&p);

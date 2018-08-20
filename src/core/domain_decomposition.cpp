@@ -28,8 +28,6 @@
 #include "domain_decomposition.hpp"
 #include "errorhandling.hpp"
 
-#include "initialize.hpp"
-
 /** Returns pointer to the cell which corresponds to the position if
     the position is in the nodes spatial domain otherwise a nullptr
     pointer. */
@@ -101,8 +99,8 @@ std::vector<int> dd_fs_neigh;
  *  DomainDecomposition::inv_cell_size, and \ref n_cells.
  */
 void dd_create_cell_grid() {
-  int i, n_local_cells, new_cells, min_ind;
-  double cell_range[3], min_size, scale, volume;
+  int i, n_local_cells, new_cells;
+  double cell_range[3];
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid: max_range %f\n",
                      this_node, max_range));
   CELL_TRACE(fprintf(
@@ -114,14 +112,20 @@ void dd_create_cell_grid() {
   cell_range[0] = cell_range[1] = cell_range[2] = max_range;
 
   if (max_range < ROUND_ERROR_PREC * box_l[0]) {
-/* this is the initialization case */
-    n_local_cells = dd.cell_grid[0] = dd.cell_grid[1] = dd.cell_grid[2] = 1;
+    /* this is the non-interacting case */
+    const int cells_per_dir = std::ceil(std::pow(min_num_cells, 1. / 3.));
+
+    dd.cell_grid[0] = cells_per_dir;
+    dd.cell_grid[1] = cells_per_dir;
+    dd.cell_grid[2] = cells_per_dir;
+    
+    n_local_cells = dd.cell_grid[0] * dd.cell_grid[1] * dd.cell_grid[2];
   } else {
     /* Calculate initial cell grid */
-    volume = local_box_l[0];
+    double volume = local_box_l[0];
     for (i = 1; i < 3; i++)
       volume *= local_box_l[i];
-    scale = pow(max_num_cells / volume, 1. / 3.);
+    double scale = pow(max_num_cells / volume, 1. / 3.);
     for (i = 0; i < 3; i++) {
       /* this is at least 1 */
       dd.cell_grid[i] = (int)ceil(local_box_l[i] * scale);
@@ -153,8 +157,8 @@ void dd_create_cell_grid() {
         break;
 
       /* find coordinate with the smallest cell range */
-      min_ind = 0;
-      min_size = cell_range[0];
+      int min_ind = 0;
+      double min_size = cell_range[0];
 
       for (i = 1; i < 3; i++) {
         if (dd.cell_grid[i] > 1 && cell_range[i] < min_size) {
@@ -511,7 +515,7 @@ void dd_init_cell_interactions() {
         for (r = m - 1; r <= m + 1; r++) {
           ind2 = get_linear_index(r, q, p, dd.ghost_cell_grid);
           if (ind2 > ind1) {
-            cells[ind1].m_neighbors.emplace_back(std::ref(cells[ind2]));
+            cells[ind1].m_neighbors.emplace_back(&cells[ind2]);
           }
         }
 
@@ -527,10 +531,9 @@ void dd_init_cell_interactions() {
     pointer. */
 Cell *dd_save_position_to_cell(double pos[3]) {
   int i, cpos[3];
-  double lpos;
 
   for (i = 0; i < 3; i++) {
-    lpos = pos[i] - my_left[i];
+    double lpos = pos[i] - my_left[i];
 
     cpos[i] = static_cast<int>(std::floor(lpos * dd.inv_cell_size[i])) + 1;
 
@@ -560,7 +563,7 @@ Cell *dd_save_position_to_cell(double pos[3]) {
    local_particles.
     @return 0 if all particles in pl reside in the nodes domain otherwise 1.*/
 int dd_append_particles(ParticleList *pl, int fold_dir) {
-  int p, dir, c, cpos[3], flag = 0, fold_coord = fold_dir / 2;
+  int p, dir, cpos[3], flag = 0, fold_coord = fold_dir / 2;
 
   CELL_TRACE(fprintf(stderr, "%d: dd_append_particles %d\n", this_node, pl->n));
 
@@ -606,7 +609,7 @@ int dd_append_particles(ParticleList *pl, int fold_dir) {
         }
       }
     }
-    c = get_linear_index(cpos[0], cpos[1], cpos[2], dd.ghost_cell_grid);
+    int c = get_linear_index(cpos[0], cpos[1], cpos[2], dd.ghost_cell_grid);
     CELL_TRACE(fprintf(
         stderr,
         "%d: dd_append_particles: Append Part id=%d to cell %d cpos %d %d %d\n",
@@ -626,7 +629,6 @@ int dd_append_particles(ParticleList *pl, int fold_dir) {
 /************************************************************/
 
 void dd_on_geometry_change(int flags) {
-
   /* check that the CPU domains are still sufficiently large. */
   for (int i = 0; i < 3; i++)
     if (local_box_l[i] < max_range) {
@@ -639,6 +641,10 @@ void dd_on_geometry_change(int flags) {
   if (flags & CELL_FLAG_GRIDCHANGED) {
     CELL_TRACE(
         fprintf(stderr, "%d: dd_on_geometry_change full redo\n", this_node));
+
+    /* Reset min num cells to default */
+    min_num_cells = calc_processor_min_num_cells();
+
     cells_re_init(CELL_STRUCTURE_CURRENT);
     return;
   }
@@ -683,21 +689,20 @@ void dd_on_geometry_change(int flags) {
     }
   }
   dd_update_communicators_w_boxl();
-  /* tell other algorithms that the box length might have changed. */
-  on_boxl_change();
 }
 
 /************************************************************/
 void dd_topology_init(CellPList *old) {
-  int c, p, np;
+  int c, p;
   int exchange_data, update_data;
-  Particle *part;
 
   CELL_TRACE(fprintf(stderr,
                      "%d: dd_topology_init: Number of recieved cells=%d\n",
                      this_node, old->n));
 
-  min_num_cells = calc_processor_min_num_cells();
+  /* Min num cells can not be smaller than calc_processor_min_num_cells,
+     but may be set to a larger value by the user for performance reasons. */
+  min_num_cells = std::max(min_num_cells, calc_processor_min_num_cells());
 
   cell_structure.type = CELL_STRUCTURE_DOMDEC;
   cell_structure.position_to_node = map_position_node_array;
@@ -732,14 +737,14 @@ void dd_topology_init(CellPList *old) {
   dd_assign_prefetches(&cell_structure.ghost_lbcoupling_comm);
 #endif
 
-#ifdef IMMERSED_BOUNDARY
-  // Immersed boundary needs to communicate the forces from but also to the
-  // ghosts
+#ifdef VIRTUAL_SITES_INERTIALESS_TRACERS
+  // Inertialess tracers (and hence Immersed boundary) needs to communicate 
+  // the forces from but also to the ghosts
   // This is different than usual collect_ghost_force_comm (not in reverse
   // order)
   // Therefore we need our own communicator
-  dd_prepare_comm(&cell_structure.ibm_ghost_force_comm, GHOSTTRANS_FORCE);
-  dd_assign_prefetches(&cell_structure.ibm_ghost_force_comm);
+  dd_prepare_comm(&cell_structure.vs_inertialess_tracers_ghost_force_comm, GHOSTTRANS_FORCE);
+  dd_assign_prefetches(&cell_structure.vs_inertialess_tracers_ghost_force_comm);
 #endif
 
 #ifdef ENGINE
@@ -752,10 +757,10 @@ void dd_topology_init(CellPList *old) {
 
   /* copy particles */
   for (c = 0; c < old->n; c++) {
-    part = old->cell[c]->part;
-    np = old->cell[c]->n;
+    Particle *part = old->cell[c]->part;
+    int np = old->cell[c]->n;
     for (p = 0; p < np; p++) {
-      Cell *nc = dd_save_position_to_cell(part[p].r.p);
+      Cell *nc = dd_save_position_to_cell(part[p].r.p.data());
       /* particle does not belong to this node. Just stow away
          somewhere for the moment */
       if (nc == nullptr)
@@ -787,8 +792,8 @@ void dd_topology_release() {
 #ifdef ENGINE
   free_comm(&cell_structure.ghost_swimming_comm);
 #endif
-#ifdef IMMERSED_BOUNDARY
-  free_comm(&cell_structure.ibm_ghost_force_comm);
+#ifdef VIRTUAL_SITES_INERTIALESS_TRACERS
+  free_comm(&cell_structure.vs_inertialess_tracers_ghost_force_comm);
 #endif
 }
 
@@ -853,7 +858,7 @@ void dd_exchange_and_sort_particles(int global_flag) {
             }
             /* Sort particles in cells of this node during last direction */
             else if (dir == 2) {
-              sort_cell = dd_save_position_to_cell(part->r.p);
+              sort_cell = dd_save_position_to_cell(part->r.p.data());
               if (sort_cell != cell) {
                 if (sort_cell == nullptr) {
                   CELL_TRACE(fprintf(
@@ -920,7 +925,7 @@ void dd_exchange_and_sort_particles(int global_flag) {
               fold_coordinate(part->r.p, part->m.v, part->l.i, dir);
             }
             if (dir == 2) {
-              sort_cell = dd_save_position_to_cell(part->r.p);
+              sort_cell = dd_save_position_to_cell(part->r.p.data());
               if (sort_cell != cell) {
                 if (sort_cell == nullptr) {
                   CELL_TRACE(fprintf(stderr, "%d: "
@@ -1021,7 +1026,6 @@ int calc_processor_min_num_cells() {
 
 /************************************************************/
 
-int dd_full_shell_neigh(int cellidx, int neigh)
-{
-    return cellidx + dd_fs_neigh[neigh];
+int dd_full_shell_neigh(int cellidx, int neigh) {
+  return cellidx + dd_fs_neigh[neigh];
 }

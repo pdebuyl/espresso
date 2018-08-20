@@ -9,16 +9,16 @@
 namespace Constraints {
 class Constraint {
 public:
+  virtual void add_energy(const Particle &p, const Vector3d &folded_pos,
+                          Observable_stat &energy) const {};
+  virtual ParticleForce force(const Particle &p,
+                              const Vector3d &folded_pos) = 0;
 
-  virtual void add_energy(Particle *p, double *folded_pos,
-                  Observable_stat &energy) const {};
+  virtual void reset_force(){};
 
-  virtual void add_force(Particle *p, double *folded_pos) {};
-
-  virtual void reset_force() {};
-
+  virtual ~Constraint() {}
 };
 
-} /* namespace Constaints */
+} /* namespace Constraints */
 
 #endif

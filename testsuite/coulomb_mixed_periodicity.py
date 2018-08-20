@@ -49,7 +49,7 @@ class CoulombMixedPeriodicity(ut.TestCase):
     def setUp(self):
         self.S.box_l = (10, 10, 10)
         self.S.time_step = 0.01
-        self.S.cell_system.skin = 0.1
+        self.S.cell_system.skin = 0.
         while len(self.S.actors)>0:
             del self.S.actors[0]
 
@@ -109,7 +109,7 @@ class CoulombMixedPeriodicity(ut.TestCase):
                     raise Exception("Particle z pos invalid")
             
             self.S.cell_system.set_domain_decomposition()
-            self.S.cell_system.node_grid = self.buf_node_grid 
+            self.S.cell_system.node_grid=sorted(self.S.cell_system.node_grid,key=lambda x:-x)
             self.S.periodicity=1,1,1
             self.S.box_l = (10, 10, 10)
 
@@ -149,7 +149,11 @@ class CoulombMixedPeriodicity(ut.TestCase):
                         prefactor=1,
                         method_name="p2nfft",
                         method_params={
-                            "tolerance_field": 1E-5})
+                            "tolerance_field": 5E-5,
+                            "pnfft_n":"96,96,128",
+                            "pnfft_N":"96,96,128",
+                            "r_cut":2.4,
+                            "pnfft_m":3})
                 self.S.actors.add(scafacos)
                 self.S.integrator.run(0)
                 self.compare("scafacos_p2nfft", energy=True)

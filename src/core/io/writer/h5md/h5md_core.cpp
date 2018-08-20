@@ -301,9 +301,9 @@ void File::create_new_file(const std::string &filename) {
   h5xx::write_attribute(group, "dimension", 3);
   h5xx::write_attribute(group, "boundary", "periodic");
   std::string path_edges = "particles/atoms/box/edges";
-  int change_extent_box =
-      3; // for three entries for cuboid box box_l_x, box_l_y, box_l_z
-  ExtendDataset(path_edges, &change_extent_box);
+  std::vector<int> change_extent_box =
+      {3}; // for three entries for cuboid box box_l_x, box_l_y, box_l_z
+  ExtendDataset(path_edges, change_extent_box);
   h5xx::write_dataset(datasets[path_edges], boxvec);
 }
 
@@ -338,8 +338,8 @@ void File::fill_arrays_for_h5md_write_with_particle_property(
     mass[0][particle_index][0] = current_particle.p.mass;
   /* store folded particle positions. */
   if (write_pos) {
-    Vector3d p{{current_particle.r.p}};
-    Vector<3, int> i{{current_particle.l.i}};
+    Vector3d p = current_particle.r.p;
+    Vector<3, int> i= current_particle.l.i;
     fold_position(p, i);
 
     pos[0][particle_index][0] = p[0];
@@ -351,17 +351,14 @@ void File::fill_arrays_for_h5md_write_with_particle_property(
   }
 
   if (write_vel) {
-    // Scale the stored velocity with 1./dt to get MD units.
-    vel[0][particle_index][0] = current_particle.m.v[0] / time_step;
-    vel[0][particle_index][1] = current_particle.m.v[1] / time_step;
-    vel[0][particle_index][2] = current_particle.m.v[2] / time_step;
+    vel[0][particle_index][0] = current_particle.m.v[0];
+    vel[0][particle_index][1] = current_particle.m.v[1];
+    vel[0][particle_index][2] = current_particle.m.v[2];
   }
   if (write_force) {
-    // Scale the stored force with m/(0.5*dt**2.0) to get MD units.
-    double fac = current_particle.p.mass / (0.5 * time_step * time_step);
-    f[0][particle_index][0] = current_particle.f.f[0] * fac;
-    f[0][particle_index][1] = current_particle.f.f[1] * fac;
-    f[0][particle_index][2] = current_particle.f.f[2] * fac;
+    f[0][particle_index][0] = current_particle.f.f[0];
+    f[0][particle_index][1] = current_particle.f.f[1];
+    f[0][particle_index][2] = current_particle.f.f[2];
   }
   if (write_charge) {
 #ifdef ELECTROSTATICS
@@ -477,9 +474,9 @@ void File::Write(int write_dat, PartCfg &partCfg) {
   }
   int extent_particle_number = m_max_n_part - old_max_n_part;
 
-  int change_extent_1d[1] = {1};
-  int change_extent_2d[2] = {1, extent_particle_number};
-  int change_extent_3d[3] = {1, extent_particle_number, 0};
+  std::vector<int> change_extent_1d = {1};
+  std::vector<int> change_extent_2d = {1, extent_particle_number};
+  std::vector<int> change_extent_3d = {1, extent_particle_number, 0};
 
   if (!m_already_wrote_bonds) {
     // communicate the total number of bonds to all processes since extending is
@@ -495,7 +492,7 @@ void File::Write(int write_dat, PartCfg &partCfg) {
     }
     hsize_t offset_bonds[2] = {(hsize_t)prefix_bonds, 0};
     hsize_t count_bonds[2] = {(hsize_t)nbonds_local, 2};
-    int change_extent_bonds[2] = {nbonds_total, 2};
+    std::vector<int> change_extent_bonds = {nbonds_total, 2};
     WriteDataset(bond, "connectivity/atoms", change_extent_bonds, offset_bonds,
                  count_bonds);
     m_already_wrote_bonds = true;
@@ -538,7 +535,7 @@ void File::Write(int write_dat, PartCfg &partCfg) {
   }
 }
 
-void File::ExtendDataset(const std::string & path, int *change_extent) {
+void File::ExtendDataset(const std::string & path, const std::vector<int> & change_extent) {
   /* Until now the h5xx does not support dataset extending, so we
      have to use the lower level hdf5 library functions. */
   auto &dataset = datasets[path];
@@ -550,14 +547,14 @@ void File::ExtendDataset(const std::string & path, int *change_extent) {
   H5Sclose(ds);
   /* Extend the dataset for another timestep (extent = 1) */
   for (int i = 0; i < rank; i++) {
-    dims[i] += change_extent[i]; // NOLINT
+    dims[i] += change_extent[i];
   }
   H5Dset_extent(dataset.hid(), dims.data()); // extend all dims is collective
 }
 
 /* data is assumed to be three dimensional */
 template <typename T>
-void File::WriteDataset(T &data, const std::string &path, int *change_extent,
+void File::WriteDataset(T &data, const std::string &path, const std::vector<int> & change_extent,
                         hsize_t *offset, hsize_t *count) {
 #ifdef H5MD_DEBUG
   /* Turn on hdf5 error messages */
@@ -589,7 +586,6 @@ void File::WriteScript(std::string const &filename) {
 #endif
   /* First get the number of lines of the script. */
   hsize_t dims[1] = {1};
-  std::string tmp;
   std::ifstream scriptfile(m_absolute_script_path.string());
   /* Read the whole script into a buffer. */
   scriptfile.seekg(0, std::ios::end);

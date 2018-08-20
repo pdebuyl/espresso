@@ -18,6 +18,7 @@
 #
 include "myconfig.pxi"
 from libcpp cimport bool
+from interactions cimport ImmersedBoundaries
 
 cdef extern from "global.hpp":
     int FIELD_BOXL
@@ -25,14 +26,13 @@ cdef extern from "global.hpp":
     int FIELD_NODEGRID
     int FIELD_MAXNUMCELLS
     int FIELD_MINNUMCELLS
-    int FIELD_NODEGRID
     int FIELD_NPTISO_PISTON
     int FIELD_NPTISO_PDIFF
     int FIELD_PERIODIC
     int FIELD_SIMTIME
     int FIELD_MIN_GLOBAL_CUT
-    int FIELD_TEMPERATURE
     int FIELD_THERMO_SWITCH
+    int FIELD_THERMO_VIRTUAL
     int FIELD_TEMPERATURE
     int FIELD_LANGEVIN_GAMMA
     int FIELD_LEES_EDWARDS
@@ -41,19 +41,18 @@ cdef extern from "global.hpp":
     IF NPT:
         int FIELD_NPTISO_G0
         int FIELD_NPTISO_GV
+    int FIELD_MAX_OIF_OBJECTS
 
     void mpi_bcast_parameter(int p)
-        
+
 cdef extern from "communication.hpp":
     extern int n_nodes
-    void mpi_set_smaller_time_step(double smaller_time_step)
     void mpi_set_time_step(double time_step)
 
 cdef extern from "integrate.hpp":
     double time_step
     extern int integ_switch
     extern double sim_time
-    extern double smaller_time_step
     extern double verlet_reuse
     extern double skin
 
@@ -80,7 +79,7 @@ cdef extern from "interaction_data.hpp":
     double dpd_r_cut
     extern double max_cut
     extern int max_seen_particle
-    extern int n_particle_types
+    extern int max_seen_particle_type
     extern double max_cut_nonbonded
     extern double max_cut_bonded
     extern double min_global_cut
@@ -177,3 +176,14 @@ cdef extern from "lees_edwards.hpp":
         double frequency
 
     cdef extern lees_edwards_protocol_struct lees_edwards_protocol
+
+cdef extern from "immersed_boundaries.hpp":
+    extern ImmersedBoundaries immersed_boundaries
+
+cdef extern from "object-in-fluid/oif_global_forces.hpp": 
+    int max_oif_objects
+
+cdef extern from "forcecap.hpp":
+    double forcecap_get()
+    void forcecap_set(double forcecap)
+

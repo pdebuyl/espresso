@@ -30,7 +30,10 @@ IF SCAFACOS == 1:
             self._set_params_in_es_core()
 
         def valid_keys(self):
-            return "method_name", "method_params", "prefactor"
+            tmp= ["method_name", "method_params", "prefactor"]
+            if not self.dipolar:
+                tmp.append("check_neutrality")
+            return tmp
 
         def required_keys(self):
             return "method_name", "method_params", "prefactor"
@@ -81,9 +84,13 @@ IF SCAFACOS == 1:
             
             # Re-add the prefactor to the parameter set
             if self.dipolar: 
-                res["prefactor"] =magnetostatics.coulomb.Dprefactor
+                IF DIPOLES == 1:
+                    res["prefactor"] = magnetostatics.coulomb.Dprefactor
+                pass
             else:
-                res["prefactor"] =electrostatics.coulomb.prefactor
+                IF ELECTROSTATICS == 1:
+                    res["prefactor"] = electrostatics.coulomb.prefactor
+                pass
             return res
 
         def _set_params_in_es_core(self):
@@ -112,6 +119,8 @@ IF SCAFACOS == 1:
             handle_errors("Scafacos not initialized.")
 
         def default_params(self):
+            if not self.dipolar: 
+                return {"check_neutrality":True}
             return {}
 
     def available_methods():

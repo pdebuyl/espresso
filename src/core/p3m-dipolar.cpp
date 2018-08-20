@@ -383,7 +383,7 @@ void dp3m_init() {
       dp3m_interpolate_dipole_assignment_function();
 
     dp3m.pos_shift =
-        (double)((dp3m.params.cao - 1) / 2) - (dp3m.params.cao % 2) / 2.0;
+        std::floor((dp3m.params.cao - 1) / 2.0) - (dp3m.params.cao % 2) / 2.0;
     P3M_TRACE(fprintf(stderr, "%d: dipolar pos_shift = %f\n", this_node,
                       dp3m.pos_shift));
 
@@ -643,7 +643,7 @@ void dp3m_dipole_assign(void) {
 
   for (auto const &p : local_cells.particles()) {
     if (p.p.dipm != 0.0) {
-      dp3m_assign_dipole(p.r.p, p.p.dipm, p.r.dip, cp_cnt);
+      dp3m_assign_dipole(p.r.p.data(), p.p.dipm, p.r.dip.data(), cp_cnt);
       cp_cnt++;
     }
   }

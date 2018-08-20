@@ -65,10 +65,7 @@ class Constraints(ScriptInterfaceHelper):
         Remove all constraints.
 
         """
-        constraints = self.call_method("get_elements")
-        for c in constraints:
-            self.remove(c)
-
+        self.call_method("clear")
 
 class Constraint(ScriptInterfaceHelper):
     """
@@ -166,7 +163,13 @@ class ShapeBasedConstraint(Constraint):
 
         """
         return self.call_method("total_force", constraint=self)
-
+        
+    def total_normal_force(self):
+        """
+        Get the total summed normal force acting on this constraint.
+        
+        """
+        return self.call_method("total_normal_force", constraint=self)
 
 class HomogeneousMagneticField(Constraint):
     """

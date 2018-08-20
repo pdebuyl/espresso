@@ -1,10 +1,6 @@
-# Call for Scientific Software Developer
-
-See http://espressomd.org/wordpress/call-for-scientific-software-developer
-
 # ESPResSo
 
-[![GitLab CI](https://gitlab.icp.uni-stuttgart.de/espressomd/espresso/badges/doc/pipeline.svg)](https://gitlab.icp.uni-stuttgart.de/espressomd/espresso/commits/doc)
+[![GitLab CI](https://gitlab.icp.uni-stuttgart.de/espressomd/espresso/badges/python/pipeline.svg)](https://gitlab.icp.uni-stuttgart.de/espressomd/espresso/commits/python)
 [![codecov](https://codecov.io/gh/espressomd/espresso/branch/python/graph/badge.svg)](https://codecov.io/gh/espressomd/espresso)
 
 This is the Molecular Dynamics software ESPResSo ("Extensible
@@ -187,7 +183,6 @@ testsuite/pe_micelle.data
 testsuite/tabulated_system.data
 testsuite/thermostat.data
 testsuite/thermostat_rot.data
-testsuite/uwerr.data
 ```
 
 > "Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project

@@ -21,13 +21,15 @@
 #include "VirtualSitesRelative.hpp"
 #include "rotation.hpp"
 #include "errorhandling.hpp" 
+#include "grid.hpp"
+#include "cells.hpp"
 
 #ifdef VIRTUAL_SITES_RELATIVE
 
 void VirtualSitesRelative::update(bool recalc_positions) const {
 
 for (auto& p : local_cells.particles()) {
-  if (!p.p.isVirtual) continue;
+  if (!p.p.is_virtual) continue;
 
   if (recalc_positions)
     update_pos(p);
@@ -85,10 +87,10 @@ void VirtualSitesRelative::update_pos(Particle& p) const
  // This is obtained, by multiplying the quaternion representing the director
  // of the real particle with the quaternion of the virtual particle, which 
  // specifies the relative orientation.
- double q[4];
+ Vector<4,double> q;
  multiply_quaternions(p_real->r.quat,p.p.vs_relative_rel_orientation,q);
  // Calculate the director resulting from the quaternions
- double director[3];
+ Vector3d director={0,0,0};
  convert_quat_to_quatu(q,director);
  // normalize
  double l =sqrt(sqrlen(director));
@@ -152,8 +154,6 @@ void VirtualSitesRelative::update_vel(Particle& p) const
  for (i=0;i<3;i++)
  {
   // Scale the velocity by the distance of virtual particle from the real particle
-  // Also, espresso stores not velocity but velocity * time_step
-  p.m.v[i] *= time_step;
   // Add velocity of real particle
   p.m.v[i] += p_real->m.v[i];
  }
@@ -165,7 +165,7 @@ void VirtualSitesRelative::back_transfer_forces_and_torques() const {
   // Iterate over all the particles in the local cells
   for (auto &p : local_cells.particles()) {
     // We only care about virtual particles
-    if (p.p.isVirtual) {
+    if (p.p.is_virtual) {
       // First obtain the real particle responsible for this virtual particle:
       Particle *p_real = local_particles[p.p.vs_relative_to_particle_id];
 
@@ -204,7 +204,7 @@ void VirtualSitesRelative::pressure_and_stress_tensor_contribution(double* press
   // Iterate over all the particles in the local cells
 
   for (auto &p : local_cells.particles()) {
-    if (!p.p.isVirtual)
+    if (!p.p.is_virtual)
       continue;
 
     update_pos(p);
@@ -227,10 +227,6 @@ void VirtualSitesRelative::pressure_and_stress_tensor_contribution(double* press
     // but the 1/3 is applied somewhere else.
     *pressure += (p.f.f[0] * d[0] + p.f.f[1] * d[1] + p.f.f[2] * d[2]);
   }
-
-  *pressure /= 0.5 * time_step * time_step;
-  for (int i = 0; i < 9; i++)
-    stress_tensor[i] /= 0.5 * time_step * time_step;
 
 }
 
