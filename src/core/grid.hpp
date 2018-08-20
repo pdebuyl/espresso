@@ -54,6 +54,10 @@
 
 #include <climits>
 
+#ifdef LEES_EDWARDS
+#include "lees_edwards.hpp"
+#endif
+
 /** Macro that tests for a coordinate being periodic or not. */
 #ifdef PARTIAL_PERIODIC
 #define PERIODIC(coord) (periodic & (1L << coord))
