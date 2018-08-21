@@ -243,7 +243,7 @@ std::size_t hash_value(Datafield const &field) {
   }
   case Datafield::Type::LEES_EDWARDS_MPI: {
     lees_edwards_protocol_struct * le_pointer;
-    auto ptr = reinterpret_cast<int *>(le_pointer->type);
+    auto ptr = reinterpret_cast<int *>(field.data);
     return hash_range(ptr, ptr + field.dimension);
   }
   default:
