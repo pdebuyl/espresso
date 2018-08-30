@@ -50,6 +50,9 @@
 #include "grid_based_algorithms/lbboundaries.hpp"
 #include "grid_based_algorithms/lbgpu.hpp"
 #include "lattice.hpp"
+#ifdef LEES_EDWARDS
+#include "lees_edwards.hpp"
+#endif
 #include "metadynamics.hpp"
 #include "nemd.hpp"
 #include "nonbonded_interactions/reaction_field.hpp"
