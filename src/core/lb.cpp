@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
+  Copyright (C) 2010-2018 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
   Max-Planck-Institute for Polymer Research, Theory Group
 
@@ -27,30 +27,23 @@
  *
  */
 
-#include <mpi.h>
-#include <cassert>
-#include <cstdio>
-#include <iostream>
-#include "config.hpp"
-#include "utils.hpp"
 #include "lb.hpp"
-#include "interaction_data.hpp"
-#include "global.hpp"
 
 #ifdef LB
 
+#include "cells.hpp"
 #include "communication.hpp"
+#include "global.hpp"
 #include "grid.hpp"
 #include "halo.hpp"
+#include "interaction_data.hpp"
 #include "lb-d3q19.hpp"
-#include "lbboundaries.hpp"
 #include "lb.hpp"
-#include "virtual_sites/lb_inertialess_tracers.hpp"
+#include "lbboundaries.hpp"
 #include "thermostat.hpp"
-#include "utils.hpp"
-#include "global.hpp"
-#include "cells.hpp"
-#include "global.hpp"
+#include "virtual_sites/lb_inertialess_tracers.hpp"
+
+#include <boost/multi_array.hpp>
 
 #include <cassert>
 #include <cstdio>
@@ -60,7 +53,8 @@
 #include "cuda_interface.hpp"
 
 #ifdef ADDITIONAL_CHECKS
-static void lb_check_halo_regions();
+static void lb_check_halo_regions(const LB_Fluid &lbfluid);
+void print_fluid();
 #endif // ADDITIONAL_CHECKS
 
 /** Flag indicating momentum exchange between particles and fluid */
@@ -112,8 +106,15 @@ LB_Model<> lbmodel = {d3q19_lattice, d3q19_coefficients, d3q19_w,
 /** The underlying lattice structure */
 Lattice lblattice;
 
-/** Pointer to the velocity populations of the fluid nodes */
-double **lbfluid[2] = {nullptr, nullptr};
+using LB_FluidData = boost::multi_array<double, 2>;
+static LB_FluidData lbfluid_a;
+static LB_FluidData lbfluid_b;
+
+/** Pointer to the velocity populations of the fluid.
+ * lbfluid contains pre-collision populations, lbfluid_post
+ * contains post-collision */
+LB_Fluid lbfluid;
+LB_Fluid lbfluid_post;
 
 /** Pointer to the hydrodynamic fields of the fluid nodes */
 std::vector<LB_FluidNode> lbfields;
@@ -142,6 +143,11 @@ static int rancounter = 0;
 #endif // LB
 
 #if defined(LB) || defined(LB_GPU)
+
+#include "errorhandling.hpp"
+#include "global.hpp"
+#include "grid.hpp"
+#include "interaction_data.hpp"
 
 /* *********************** C Interface part
  * *************************************/
@@ -656,10 +662,11 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
 
     int j;
     /** print of the calculated phys values */
-    fprintf(fp, "# vtk DataFile Version 2.0\nlbboundaries\n"
-                "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %u %u %u\n"
-                "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %u\n"
-                "SCALARS boundary float 1\nLOOKUP_TABLE default\n",
+    fprintf(fp,
+            "# vtk DataFile Version 2.0\nlbboundaries\n"
+            "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %u %u %u\n"
+            "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %u\n"
+            "SCALARS boundary float 1\nLOOKUP_TABLE default\n",
             lbpar_gpu.dim_x, lbpar_gpu.dim_y, lbpar_gpu.dim_z,
             lbpar_gpu.agrid * 0.5, lbpar_gpu.agrid * 0.5, lbpar_gpu.agrid * 0.5,
             lbpar_gpu.agrid, lbpar_gpu.agrid, lbpar_gpu.agrid,
@@ -680,10 +687,11 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
     gridsize[1] = box_l[1] / lbpar.agrid;
     gridsize[2] = box_l[2] / lbpar.agrid;
 
-    fprintf(fp, "# vtk DataFile Version 2.0\nlbboundaries\n"
-                "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %d %d %d\n"
-                "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %d\n"
-                "SCALARS boundary float 1\nLOOKUP_TABLE default\n",
+    fprintf(fp,
+            "# vtk DataFile Version 2.0\nlbboundaries\n"
+            "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %d %d %d\n"
+            "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %d\n"
+            "SCALARS boundary float 1\nLOOKUP_TABLE default\n",
             gridsize[0], gridsize[1], gridsize[2], lblattice.agrid[0] * 0.5,
             lblattice.agrid[1] * 0.5, lblattice.agrid[2] * 0.5,
             lblattice.agrid[0], lblattice.agrid[1], lblattice.agrid[2],
@@ -723,10 +731,11 @@ int lb_lbfluid_print_vtk_density(char **filename) {
       host_values = (LB_rho_v_pi_gpu *)Utils::malloc(size_of_values);
       lb_get_values_GPU(host_values);
 
-      fprintf(fp, "# vtk DataFile Version 2.0\nlbfluid_gpu\nASCII\nDATASET "
-                  "STRUCTURED_POINTS\nDIMENSIONS %u %u %u\nORIGIN %f %f "
-                  "%f\nSPACING %f %f %f\nPOINT_DATA %u\nSCALARS density float "
-                  "1\nLOOKUP_TABLE default\n",
+      fprintf(fp,
+              "# vtk DataFile Version 2.0\nlbfluid_gpu\nASCII\nDATASET "
+              "STRUCTURED_POINTS\nDIMENSIONS %u %u %u\nORIGIN %f %f "
+              "%f\nSPACING %f %f %f\nPOINT_DATA %u\nSCALARS density float "
+              "1\nLOOKUP_TABLE default\n",
               lbpar_gpu.dim_x, lbpar_gpu.dim_y, lbpar_gpu.dim_z,
               lbpar_gpu.agrid * 0.5, lbpar_gpu.agrid * 0.5,
               lbpar_gpu.agrid * 0.5, lbpar_gpu.agrid, lbpar_gpu.agrid,
@@ -790,10 +799,11 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
     size_t size_of_values = lbpar_gpu.number_of_nodes * sizeof(LB_rho_v_pi_gpu);
     host_values = (LB_rho_v_pi_gpu *)Utils::malloc(size_of_values);
     lb_get_values_GPU(host_values);
-    fprintf(fp, "# vtk DataFile Version 2.0\nlbfluid_gpu\n"
-                "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %d %d %d\n"
-                "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %d\n"
-                "SCALARS velocity float 3\nLOOKUP_TABLE default\n",
+    fprintf(fp,
+            "# vtk DataFile Version 2.0\nlbfluid_gpu\n"
+            "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %d %d %d\n"
+            "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %d\n"
+            "SCALARS velocity float 3\nLOOKUP_TABLE default\n",
             bb_high[0] - bb_low[0] + 1, bb_high[1] - bb_low[1] + 1,
             bb_high[2] - bb_low[2] + 1, (bb_low[0] + 0.5) * lbpar_gpu.agrid,
             (bb_low[1] + 0.5) * lbpar_gpu.agrid,
@@ -815,10 +825,11 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
 #ifdef LB
     double u[3];
 
-    fprintf(fp, "# vtk DataFile Version 2.0\nlbfluid_cpu\n"
-                "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %d %d %d\n"
-                "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %d\n"
-                "SCALARS velocity float 3\nLOOKUP_TABLE default\n",
+    fprintf(fp,
+            "# vtk DataFile Version 2.0\nlbfluid_cpu\n"
+            "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %d %d %d\n"
+            "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %d\n"
+            "SCALARS velocity float 3\nLOOKUP_TABLE default\n",
             bb_high[0] - bb_low[0] + 1, bb_high[1] - bb_low[1] + 1,
             bb_high[2] - bb_low[2] + 1, (bb_low[0] + 0.5) * lblattice.agrid[0],
             (bb_low[1] + 0.5) * lblattice.agrid[1],
@@ -1295,14 +1306,6 @@ int lb_lbfluid_get_interpolated_velocity_global(Vector3d &p, double *v) {
 #endif // LB
         }
 
-#ifdef SHANCHEN
-        // printf (" %d %d %d %f %f %f\n", tmpind[0], tmpind[1],tmpind[2],v[0],
-        // v[1], v[2]);
-        fprintf(stderr, "TODO:adapt for SHANCHEN (%s:%d)\n", __FILE__,
-                __LINE__);
-        errexit();
-#endif // SHANCHEN
-
         lb_lbnode_get_u(tmpind, local_v);
 
         v[0] +=
@@ -1462,8 +1465,8 @@ int lb_lbnode_set_rho(int *ind, double *p_rho) {
     Lattice::index_t index;
     int node, grid[3], ind_shifted[3];
     double rho;
-    double j[3];
-    double pi[6];
+    std::array<double, 3> j;
+    std::array<double, 6> pi;
 
     ind_shifted[0] = ind[0];
     ind_shifted[1] = ind[1];
@@ -1472,7 +1475,7 @@ int lb_lbnode_set_rho(int *ind, double *p_rho) {
     index = get_linear_index(ind_shifted[0], ind_shifted[1], ind_shifted[2],
                              lblattice.halo_grid);
 
-    mpi_recv_fluid(node, index, &rho, j, pi);
+    mpi_recv_fluid(node, index, &rho, j.data(), pi.data());
     rho = (*p_rho) * lbpar.agrid * lbpar.agrid * lbpar.agrid;
     mpi_send_fluid(node, index, rho, j, pi);
 
@@ -1499,8 +1502,8 @@ int lb_lbnode_set_u(int *ind, double *u) {
     Lattice::index_t index;
     int node, grid[3], ind_shifted[3];
     double rho;
-    double j[3];
-    double pi[6];
+    std::array<double, 3> j;
+    std::array<double, 6> pi;
 
     ind_shifted[0] = ind[0];
     ind_shifted[1] = ind[1];
@@ -1511,7 +1514,7 @@ int lb_lbnode_set_u(int *ind, double *u) {
 
     /* transform to lattice units */
 
-    mpi_recv_fluid(node, index, &rho, j, pi);
+    mpi_recv_fluid(node, index, &rho, j.data(), pi.data());
     j[0] = rho * u[0] * lbpar.tau / lbpar.agrid;
     j[1] = rho * u[1] * lbpar.tau / lbpar.agrid;
     j[2] = rho * u[2] * lbpar.tau / lbpar.agrid;
@@ -1559,7 +1562,7 @@ int lb_lbnode_set_extforce_density(int *ind, double *f) { return -100; }
 #ifdef LB
 /********************** The Main LB Part *************************************/
 /* Halo communication for push scheme */
-static void halo_push_communication() {
+static void halo_push_communication(LB_Fluid &lbfluid) {
   Lattice::index_t index;
   int x, y, z, count;
   int rnode, snode;
@@ -1585,11 +1588,11 @@ static void halo_push_communication() {
   for (z = 0; z < lblattice.halo_grid[2]; z++) {
     for (y = 0; y < lblattice.halo_grid[1]; y++) {
 
-      buffer[0] = lbfluid[1][1][index];
-      buffer[1] = lbfluid[1][7][index];
-      buffer[2] = lbfluid[1][9][index];
-      buffer[3] = lbfluid[1][11][index];
-      buffer[4] = lbfluid[1][13][index];
+      buffer[0] = lbfluid[1][index];
+      buffer[1] = lbfluid[7][index];
+      buffer[2] = lbfluid[9][index];
+      buffer[3] = lbfluid[11][index];
+      buffer[4] = lbfluid[13][index];
       buffer += 5;
 
       index += yperiod;
@@ -1608,11 +1611,11 @@ static void halo_push_communication() {
   for (z = 0; z < lblattice.halo_grid[2]; z++) {
     for (y = 0; y < lblattice.halo_grid[1]; y++) {
 
-      lbfluid[1][1][index] = buffer[0];
-      lbfluid[1][7][index] = buffer[1];
-      lbfluid[1][9][index] = buffer[2];
-      lbfluid[1][11][index] = buffer[3];
-      lbfluid[1][13][index] = buffer[4];
+      lbfluid[1][index] = buffer[0];
+      lbfluid[7][index] = buffer[1];
+      lbfluid[9][index] = buffer[2];
+      lbfluid[11][index] = buffer[3];
+      lbfluid[13][index] = buffer[4];
       buffer += 5;
 
       index += yperiod;
@@ -1628,11 +1631,11 @@ static void halo_push_communication() {
   for (z = 0; z < lblattice.halo_grid[2]; z++) {
     for (y = 0; y < lblattice.halo_grid[1]; y++) {
 
-      buffer[0] = lbfluid[1][2][index];
-      buffer[1] = lbfluid[1][8][index];
-      buffer[2] = lbfluid[1][10][index];
-      buffer[3] = lbfluid[1][12][index];
-      buffer[4] = lbfluid[1][14][index];
+      buffer[0] = lbfluid[2][index];
+      buffer[1] = lbfluid[8][index];
+      buffer[2] = lbfluid[10][index];
+      buffer[3] = lbfluid[12][index];
+      buffer[4] = lbfluid[14][index];
       buffer += 5;
 
       index += yperiod;
@@ -1651,11 +1654,11 @@ static void halo_push_communication() {
   for (z = 0; z < lblattice.halo_grid[2]; z++) {
     for (y = 0; y < lblattice.halo_grid[1]; y++) {
 
-      lbfluid[1][2][index] = buffer[0];
-      lbfluid[1][8][index] = buffer[1];
-      lbfluid[1][10][index] = buffer[2];
-      lbfluid[1][12][index] = buffer[3];
-      lbfluid[1][14][index] = buffer[4];
+      lbfluid[2][index] = buffer[0];
+      lbfluid[8][index] = buffer[1];
+      lbfluid[10][index] = buffer[2];
+      lbfluid[12][index] = buffer[3];
+      lbfluid[14][index] = buffer[4];
       buffer += 5;
 
       index += yperiod;
@@ -1678,11 +1681,11 @@ static void halo_push_communication() {
   for (z = 0; z < lblattice.halo_grid[2]; z++) {
     for (x = 0; x < lblattice.halo_grid[0]; x++) {
 
-      buffer[0] = lbfluid[1][3][index];
-      buffer[1] = lbfluid[1][7][index];
-      buffer[2] = lbfluid[1][10][index];
-      buffer[3] = lbfluid[1][15][index];
-      buffer[4] = lbfluid[1][17][index];
+      buffer[0] = lbfluid[3][index];
+      buffer[1] = lbfluid[7][index];
+      buffer[2] = lbfluid[10][index];
+      buffer[3] = lbfluid[15][index];
+      buffer[4] = lbfluid[17][index];
       buffer += 5;
 
       ++index;
@@ -1702,11 +1705,11 @@ static void halo_push_communication() {
   for (z = 0; z < lblattice.halo_grid[2]; z++) {
     for (x = 0; x < lblattice.halo_grid[0]; x++) {
 
-      lbfluid[1][3][index] = buffer[0];
-      lbfluid[1][7][index] = buffer[1];
-      lbfluid[1][10][index] = buffer[2];
-      lbfluid[1][15][index] = buffer[3];
-      lbfluid[1][17][index] = buffer[4];
+      lbfluid[3][index] = buffer[0];
+      lbfluid[7][index] = buffer[1];
+      lbfluid[10][index] = buffer[2];
+      lbfluid[15][index] = buffer[3];
+      lbfluid[17][index] = buffer[4];
       buffer += 5;
 
       ++index;
@@ -1723,11 +1726,11 @@ static void halo_push_communication() {
   for (z = 0; z < lblattice.halo_grid[2]; z++) {
     for (x = 0; x < lblattice.halo_grid[0]; x++) {
 
-      buffer[0] = lbfluid[1][4][index];
-      buffer[1] = lbfluid[1][8][index];
-      buffer[2] = lbfluid[1][9][index];
-      buffer[3] = lbfluid[1][16][index];
-      buffer[4] = lbfluid[1][18][index];
+      buffer[0] = lbfluid[4][index];
+      buffer[1] = lbfluid[8][index];
+      buffer[2] = lbfluid[9][index];
+      buffer[3] = lbfluid[16][index];
+      buffer[4] = lbfluid[18][index];
       buffer += 5;
 
       ++index;
@@ -1747,11 +1750,11 @@ static void halo_push_communication() {
   for (z = 0; z < lblattice.halo_grid[2]; z++) {
     for (x = 0; x < lblattice.halo_grid[0]; x++) {
 
-      lbfluid[1][4][index] = buffer[0];
-      lbfluid[1][8][index] = buffer[1];
-      lbfluid[1][9][index] = buffer[2];
-      lbfluid[1][16][index] = buffer[3];
-      lbfluid[1][18][index] = buffer[4];
+      lbfluid[4][index] = buffer[0];
+      lbfluid[8][index] = buffer[1];
+      lbfluid[9][index] = buffer[2];
+      lbfluid[16][index] = buffer[3];
+      lbfluid[18][index] = buffer[4];
       buffer += 5;
 
       ++index;
@@ -1775,11 +1778,11 @@ static void halo_push_communication() {
   for (y = 0; y < lblattice.halo_grid[1]; y++) {
     for (x = 0; x < lblattice.halo_grid[0]; x++) {
 
-      buffer[0] = lbfluid[1][5][index];
-      buffer[1] = lbfluid[1][11][index];
-      buffer[2] = lbfluid[1][14][index];
-      buffer[3] = lbfluid[1][15][index];
-      buffer[4] = lbfluid[1][18][index];
+      buffer[0] = lbfluid[5][index];
+      buffer[1] = lbfluid[11][index];
+      buffer[2] = lbfluid[14][index];
+      buffer[3] = lbfluid[15][index];
+      buffer[4] = lbfluid[18][index];
       buffer += 5;
 
       ++index;
@@ -1798,11 +1801,11 @@ static void halo_push_communication() {
   for (y = 0; y < lblattice.halo_grid[1]; y++) {
     for (x = 0; x < lblattice.halo_grid[0]; x++) {
 
-      lbfluid[1][5][index] = buffer[0];
-      lbfluid[1][11][index] = buffer[1];
-      lbfluid[1][14][index] = buffer[2];
-      lbfluid[1][15][index] = buffer[3];
-      lbfluid[1][18][index] = buffer[4];
+      lbfluid[5][index] = buffer[0];
+      lbfluid[11][index] = buffer[1];
+      lbfluid[14][index] = buffer[2];
+      lbfluid[15][index] = buffer[3];
+      lbfluid[18][index] = buffer[4];
       buffer += 5;
 
       ++index;
@@ -1818,11 +1821,11 @@ static void halo_push_communication() {
   for (y = 0; y < lblattice.halo_grid[1]; y++) {
     for (x = 0; x < lblattice.halo_grid[0]; x++) {
 
-      buffer[0] = lbfluid[1][6][index];
-      buffer[1] = lbfluid[1][12][index];
-      buffer[2] = lbfluid[1][13][index];
-      buffer[3] = lbfluid[1][16][index];
-      buffer[4] = lbfluid[1][17][index];
+      buffer[0] = lbfluid[6][index];
+      buffer[1] = lbfluid[12][index];
+      buffer[2] = lbfluid[13][index];
+      buffer[3] = lbfluid[16][index];
+      buffer[4] = lbfluid[17][index];
       buffer += 5;
 
       ++index;
@@ -1841,11 +1844,11 @@ static void halo_push_communication() {
   for (y = 0; y < lblattice.halo_grid[1]; y++) {
     for (x = 0; x < lblattice.halo_grid[0]; x++) {
 
-      lbfluid[1][6][index] = buffer[0];
-      lbfluid[1][12][index] = buffer[1];
-      lbfluid[1][13][index] = buffer[2];
-      lbfluid[1][16][index] = buffer[3];
-      lbfluid[1][17][index] = buffer[4];
+      lbfluid[6][index] = buffer[0];
+      lbfluid[12][index] = buffer[1];
+      lbfluid[13][index] = buffer[2];
+      lbfluid[16][index] = buffer[3];
+      lbfluid[17][index] = buffer[4];
       buffer += 5;
 
       ++index;
@@ -1893,43 +1896,24 @@ int lb_sanity_checks() {
                          "lattice-Boltzmann grid spacing";
     ret = -1;
   }
-  if (thermo_switch & ~THERMO_LB) {
-    runtimeErrorMsg() << "LB must not be used with other thermostats";
-    ret = 1;
-  }
   return ret;
 }
 
 /***********************************************************************/
 
-/** (Pre-)allocate memory for data structures */
-void lb_pre_init() {
-  lbfluid[0] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
-  lbfluid[0][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
-                                          lbmodel.n_veloc * sizeof(double));
-  lbfluid[1] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
-  lbfluid[1][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
-                                          lbmodel.n_veloc * sizeof(double));
-}
-
 /** (Re-)allocate memory for the fluid and initialize pointers. */
 static void lb_realloc_fluid() {
-  int i;
-
   LB_TRACE(printf("reallocating fluid\n"));
+  const std::array<int, 2> size = {
+      {lbmodel.n_veloc, lblattice.halo_grid_volume}};
 
-  lbfluid[0] = Utils::realloc(lbfluid[0], lbmodel.n_veloc * sizeof(double *));
-  lbfluid[1] = Utils::realloc(lbfluid[1], lbmodel.n_veloc * sizeof(double *));
-  lbfluid[0][0] =
-      Utils::realloc(lbfluid[0][0], lblattice.halo_grid_volume *
-                                        lbmodel.n_veloc * sizeof(double));
-  lbfluid[1][0] =
-      Utils::realloc(lbfluid[1][0], lblattice.halo_grid_volume *
-                                        lbmodel.n_veloc * sizeof(double));
+  lbfluid_a.resize(size);
+  lbfluid_b.resize(size);
 
-  for (i = 0; i < lbmodel.n_veloc; ++i) {
-    lbfluid[0][i] = lbfluid[0][0] + i * lblattice.halo_grid_volume;
-    lbfluid[1][i] = lbfluid[1][0] + i * lblattice.halo_grid_volume;
+  using Utils::Span;
+  for (int i = 0; i < size[0]; i++) {
+    lbfluid[i] = Span<double>(lbfluid_a[i].origin(), size[1]);
+    lbfluid_post[i] = Span<double>(lbfluid_b[i].origin(), size[1]);
   }
 
   lbfields.resize(lblattice.halo_grid_volume);
@@ -1993,19 +1977,17 @@ void lb_reinit_parameters() {
   if (lbpar.viscosity > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
-    lbpar.gamma_shear =
-        1. -
-        2. / (6. * lbpar.viscosity * lbpar.tau / (lbpar.agrid * lbpar.agrid) +
-              1.);
+    lbpar.gamma_shear = 1. - 2. / (6. * lbpar.viscosity * lbpar.tau /
+                                       (lbpar.agrid * lbpar.agrid) +
+                                   1.);
   }
 
   if (lbpar.bulk_viscosity > 0.0) {
     /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
-    lbpar.gamma_bulk = 1. -
-                       2. / (9. * lbpar.bulk_viscosity * lbpar.tau /
-                                 (lbpar.agrid * lbpar.agrid) +
-                             1.);
+    lbpar.gamma_bulk = 1. - 2. / (9. * lbpar.bulk_viscosity * lbpar.tau /
+                                      (lbpar.agrid * lbpar.agrid) +
+                                  1.);
   }
 
   if (lbpar.is_TRT) {
@@ -2076,16 +2058,14 @@ void lb_reinit_fluid() {
   /* default values for fields in lattice units */
   /* here the conversion to lb units is performed */
   double rho = lbpar.rho * lbpar.agrid * lbpar.agrid * lbpar.agrid;
-  double j[3] = {0., 0., 0.};
-  // double pi[6] = { rho*lbmodel.c_sound_sq, 0., rho*lbmodel.c_sound_sq, 0.,
-  // 0., rho*lbmodel.c_sound_sq };
-  double pi[6] = {0., 0., 0., 0., 0., 0.};
+  std::array<double, 3> j = {{0., 0., 0.}};
+  std::array<double, 6> pi = {{0., 0., 0., 0., 0., 0.}};
 
   LB_TRACE(fprintf(stderr,
                    "Initialising the fluid with equilibrium populations\n"););
 
   for (Lattice::index_t index = 0; index < lblattice.halo_grid_volume;
-       index++) {
+       ++index) {
     // calculate equilibrium distribution
     lb_calc_n_from_rho_j_pi(index, rho, j, pi);
 
@@ -2142,26 +2122,16 @@ void lb_init() {
   LB_TRACE(printf("Initialzing fluid on CPU successful\n"));
 }
 
-/** Release the fluid. */
-void lb_release_fluid() {
-  free(lbfluid[0][0]);
-  free(lbfluid[0]);
-  free(lbfluid[1][0]);
-  free(lbfluid[1]);
-}
-
 /** Release fluid and communication. */
-void lb_release() {
-  lb_release_fluid();
-  release_halo_communication(&update_halo_comm);
-}
+void lb_release() { release_halo_communication(&update_halo_comm); }
 
 /***********************************************************************/
 /** \name Mapping between hydrodynamic fields and particle populations */
 /***********************************************************************/
 /*@{*/
 void lb_calc_n_from_rho_j_pi(const Lattice::index_t index, const double rho,
-                             const double *j, double *pi) {
+                             const std::array<double, 3> &j,
+                             const std::array<double, 6> &pi) {
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
   const double avg_rho = lbpar.rho * lbpar.agrid * lbpar.agrid * lbpar.agrid;
@@ -2181,23 +2151,23 @@ void lb_calc_n_from_rho_j_pi(const Lattice::index_t index, const double rho,
   double tmp1, tmp2;
 
   /* update the q=0 sublattice */
-  lbfluid[0][0][index] = 1. / 3. * (local_rho - avg_rho) - 1. / 2. * trace;
+  lbfluid[0][index] = 1. / 3. * (local_rho - avg_rho) - 1. / 2. * trace;
 
   /* update the q=1 sublattice */
   rho_times_coeff = 1. / 18. * (local_rho - avg_rho);
 
-  lbfluid[0][1][index] = rho_times_coeff + 1. / 6. * local_j[0] +
-                         1. / 4. * local_pi[0] - 1. / 12. * trace;
-  lbfluid[0][2][index] = rho_times_coeff - 1. / 6. * local_j[0] +
-                         1. / 4. * local_pi[0] - 1. / 12. * trace;
-  lbfluid[0][3][index] = rho_times_coeff + 1. / 6. * local_j[1] +
-                         1. / 4. * local_pi[2] - 1. / 12. * trace;
-  lbfluid[0][4][index] = rho_times_coeff - 1. / 6. * local_j[1] +
-                         1. / 4. * local_pi[2] - 1. / 12. * trace;
-  lbfluid[0][5][index] = rho_times_coeff + 1. / 6. * local_j[2] +
-                         1. / 4. * local_pi[5] - 1. / 12. * trace;
-  lbfluid[0][6][index] = rho_times_coeff - 1. / 6. * local_j[2] +
-                         1. / 4. * local_pi[5] - 1. / 12. * trace;
+  lbfluid[1][index] = rho_times_coeff + 1. / 6. * local_j[0] +
+                      1. / 4. * local_pi[0] - 1. / 12. * trace;
+  lbfluid[2][index] = rho_times_coeff - 1. / 6. * local_j[0] +
+                      1. / 4. * local_pi[0] - 1. / 12. * trace;
+  lbfluid[3][index] = rho_times_coeff + 1. / 6. * local_j[1] +
+                      1. / 4. * local_pi[2] - 1. / 12. * trace;
+  lbfluid[4][index] = rho_times_coeff - 1. / 6. * local_j[1] +
+                      1. / 4. * local_pi[2] - 1. / 12. * trace;
+  lbfluid[5][index] = rho_times_coeff + 1. / 6. * local_j[2] +
+                      1. / 4. * local_pi[5] - 1. / 12. * trace;
+  lbfluid[6][index] = rho_times_coeff - 1. / 6. * local_j[2] +
+                      1. / 4. * local_pi[5] - 1. / 12. * trace;
 
   /* update the q=2 sublattice */
   rho_times_coeff = 1. / 36. * (local_rho - avg_rho);
@@ -2205,50 +2175,38 @@ void lb_calc_n_from_rho_j_pi(const Lattice::index_t index, const double rho,
   tmp1 = local_pi[0] + local_pi[2];
   tmp2 = 2.0 * local_pi[1];
 
-  lbfluid[0][7][index] = rho_times_coeff +
-                         1. / 12. * (local_j[0] + local_j[1]) +
-                         1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
-  lbfluid[0][8][index] = rho_times_coeff -
-                         1. / 12. * (local_j[0] + local_j[1]) +
-                         1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
-  lbfluid[0][9][index] = rho_times_coeff +
-                         1. / 12. * (local_j[0] - local_j[1]) +
-                         1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
-  lbfluid[0][10][index] = rho_times_coeff -
-                          1. / 12. * (local_j[0] - local_j[1]) +
-                          1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
+  lbfluid[7][index] = rho_times_coeff + 1. / 12. * (local_j[0] + local_j[1]) +
+                      1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
+  lbfluid[8][index] = rho_times_coeff - 1. / 12. * (local_j[0] + local_j[1]) +
+                      1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
+  lbfluid[9][index] = rho_times_coeff + 1. / 12. * (local_j[0] - local_j[1]) +
+                      1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
+  lbfluid[10][index] = rho_times_coeff - 1. / 12. * (local_j[0] - local_j[1]) +
+                       1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
 
   tmp1 = local_pi[0] + local_pi[5];
   tmp2 = 2.0 * local_pi[3];
 
-  lbfluid[0][11][index] = rho_times_coeff +
-                          1. / 12. * (local_j[0] + local_j[2]) +
-                          1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
-  lbfluid[0][12][index] = rho_times_coeff -
-                          1. / 12. * (local_j[0] + local_j[2]) +
-                          1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
-  lbfluid[0][13][index] = rho_times_coeff +
-                          1. / 12. * (local_j[0] - local_j[2]) +
-                          1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
-  lbfluid[0][14][index] = rho_times_coeff -
-                          1. / 12. * (local_j[0] - local_j[2]) +
-                          1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
+  lbfluid[11][index] = rho_times_coeff + 1. / 12. * (local_j[0] + local_j[2]) +
+                       1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
+  lbfluid[12][index] = rho_times_coeff - 1. / 12. * (local_j[0] + local_j[2]) +
+                       1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
+  lbfluid[13][index] = rho_times_coeff + 1. / 12. * (local_j[0] - local_j[2]) +
+                       1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
+  lbfluid[14][index] = rho_times_coeff - 1. / 12. * (local_j[0] - local_j[2]) +
+                       1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
 
   tmp1 = local_pi[2] + local_pi[5];
   tmp2 = 2.0 * local_pi[4];
 
-  lbfluid[0][15][index] = rho_times_coeff +
-                          1. / 12. * (local_j[1] + local_j[2]) +
-                          1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
-  lbfluid[0][16][index] = rho_times_coeff -
-                          1. / 12. * (local_j[1] + local_j[2]) +
-                          1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
-  lbfluid[0][17][index] = rho_times_coeff +
-                          1. / 12. * (local_j[1] - local_j[2]) +
-                          1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
-  lbfluid[0][18][index] = rho_times_coeff -
-                          1. / 12. * (local_j[1] - local_j[2]) +
-                          1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
+  lbfluid[15][index] = rho_times_coeff + 1. / 12. * (local_j[1] + local_j[2]) +
+                       1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
+  lbfluid[16][index] = rho_times_coeff - 1. / 12. * (local_j[1] + local_j[2]) +
+                       1. / 8. * (tmp1 + tmp2) - 1. / 24. * trace;
+  lbfluid[17][index] = rho_times_coeff + 1. / 12. * (local_j[1] - local_j[2]) +
+                       1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
+  lbfluid[18][index] = rho_times_coeff - 1. / 12. * (local_j[1] - local_j[2]) +
+                       1. / 8. * (tmp1 - tmp2) - 1. / 24. * trace;
 }
 
 /*@}*/
@@ -2258,29 +2216,25 @@ void lb_calc_modes(Lattice::index_t index, double *mode) {
   double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, n7p,
       n7m, n8p, n8m, n9p, n9m;
 
-  n0 = lbfluid[0][0][index];
-  n1p = lbfluid[0][1][index] + lbfluid[0][2][index];
-  n1m = lbfluid[0][1][index] - lbfluid[0][2][index];
-  n2p = lbfluid[0][3][index] + lbfluid[0][4][index];
-  n2m = lbfluid[0][3][index] - lbfluid[0][4][index];
-  n3p = lbfluid[0][5][index] + lbfluid[0][6][index];
-  n3m = lbfluid[0][5][index] - lbfluid[0][6][index];
-  n4p = lbfluid[0][7][index] + lbfluid[0][8][index];
-  n4m = lbfluid[0][7][index] - lbfluid[0][8][index];
-  n5p = lbfluid[0][9][index] + lbfluid[0][10][index];
-  n5m = lbfluid[0][9][index] - lbfluid[0][10][index];
-  n6p = lbfluid[0][11][index] + lbfluid[0][12][index];
-  n6m = lbfluid[0][11][index] - lbfluid[0][12][index];
-  n7p = lbfluid[0][13][index] + lbfluid[0][14][index];
-  n7m = lbfluid[0][13][index] - lbfluid[0][14][index];
-  n8p = lbfluid[0][15][index] + lbfluid[0][16][index];
-  n8m = lbfluid[0][15][index] - lbfluid[0][16][index];
-  n9p = lbfluid[0][17][index] + lbfluid[0][18][index];
-  n9m = lbfluid[0][17][index] - lbfluid[0][18][index];
-  //  printf("n: ");
-  //  for (i=0; i<19; i++)
-  //    printf("%f ", lbfluid[1][i][index]);
-  //  printf("\n");
+  n0 = lbfluid[0][index];
+  n1p = lbfluid[1][index] + lbfluid[2][index];
+  n1m = lbfluid[1][index] - lbfluid[2][index];
+  n2p = lbfluid[3][index] + lbfluid[4][index];
+  n2m = lbfluid[3][index] - lbfluid[4][index];
+  n3p = lbfluid[5][index] + lbfluid[6][index];
+  n3m = lbfluid[5][index] - lbfluid[6][index];
+  n4p = lbfluid[7][index] + lbfluid[8][index];
+  n4m = lbfluid[7][index] - lbfluid[8][index];
+  n5p = lbfluid[9][index] + lbfluid[10][index];
+  n5m = lbfluid[9][index] - lbfluid[10][index];
+  n6p = lbfluid[11][index] + lbfluid[12][index];
+  n6m = lbfluid[11][index] - lbfluid[12][index];
+  n7p = lbfluid[13][index] + lbfluid[14][index];
+  n7m = lbfluid[13][index] - lbfluid[14][index];
+  n8p = lbfluid[15][index] + lbfluid[16][index];
+  n8m = lbfluid[15][index] - lbfluid[16][index];
+  n9p = lbfluid[17][index] + lbfluid[18][index];
+  n9m = lbfluid[17][index] - lbfluid[18][index];
 
   /* mass mode */
   mode[0] = n0 + n1p + n2p + n3p + n4p + n5p + n6p + n7p + n8p + n9p;
@@ -2318,9 +2272,6 @@ inline void lb_relax_modes(Lattice::index_t index, double *mode) {
    * equilibrium value */
   rho = mode[0] + lbpar.rho * lbpar.agrid * lbpar.agrid * lbpar.agrid;
 
-  /* if forces are present, the momentum density is redefined to
-   * include one half-step of the force action.  See the
-   * Chapman-Enskog expansion in [Ladd & Verberg]. */
   j[0] = mode[1] + 0.5 * lbfields[index].force_density[0];
   j[1] = mode[2] + 0.5 * lbfields[index].force_density[1];
   j[2] = mode[3] + 0.5 * lbfields[index].force_density[2];
@@ -2444,21 +2395,8 @@ inline void lb_reset_force_densities(Lattice::index_t index) {
                                      lbpar.agrid * lbpar.tau * lbpar.tau;
 }
 
-/** Resets the forces on the fluid nodes */
-void lb_reinit_force_densities() {
-  for (Lattice::index_t index = 0; index < lblattice.halo_grid_volume;
-       index++) {
-    lb_reset_force_densities(index);
-  }
-#ifdef LB_BOUNDARIES
-  for (auto it = LBBoundaries::lbboundaries.begin();
-       it != LBBoundaries::lbboundaries.end(); ++it) {
-    (**it).reset_force();
-  }
-#endif // LB_BOUNDARIES
-}
-
-inline void lb_calc_n_from_modes_push(Lattice::index_t index, double *m) {
+inline void lb_calc_n_from_modes_push(LB_Fluid &lbfluid, Lattice::index_t index,
+                                      double *m) {
   int yperiod = lblattice.halo_grid[0];
   int zperiod = lblattice.halo_grid[0] * lblattice.halo_grid[1];
   Lattice::index_t next[19];
@@ -2486,53 +2424,45 @@ inline void lb_calc_n_from_modes_push(Lattice::index_t index, double *m) {
   for (int i = 0; i < lbmodel.n_veloc; i++)
     m[i] = (1. / lbmodel.e[19][i]) * m[i];
 
-  lbfluid[1][0][next[0]] = m[0] - m[4] + m[16];
-  lbfluid[1][1][next[1]] =
+  lbfluid[0][next[0]] = m[0] - m[4] + m[16];
+  lbfluid[1][next[1]] =
       m[0] + m[1] + m[5] + m[6] - m[17] - m[18] - 2. * (m[10] + m[16]);
-  lbfluid[1][2][next[2]] =
+  lbfluid[2][next[2]] =
       m[0] - m[1] + m[5] + m[6] - m[17] - m[18] + 2. * (m[10] - m[16]);
-  lbfluid[1][3][next[3]] =
+  lbfluid[3][next[3]] =
       m[0] + m[2] - m[5] + m[6] + m[17] - m[18] - 2. * (m[11] + m[16]);
-  lbfluid[1][4][next[4]] =
+  lbfluid[4][next[4]] =
       m[0] - m[2] - m[5] + m[6] + m[17] - m[18] + 2. * (m[11] - m[16]);
-  lbfluid[1][5][next[5]] = m[0] + m[3] - 2. * (m[6] + m[12] + m[16] - m[18]);
-  lbfluid[1][6][next[6]] = m[0] - m[3] - 2. * (m[6] - m[12] + m[16] - m[18]);
-  lbfluid[1][7][next[7]] = m[0] + m[1] + m[2] + m[4] + 2. * m[6] + m[7] +
-                           m[10] + m[11] + m[13] + m[14] + m[16] + 2. * m[18];
-  lbfluid[1][8][next[8]] = m[0] - m[1] - m[2] + m[4] + 2. * m[6] + m[7] -
-                           m[10] - m[11] - m[13] - m[14] + m[16] + 2. * m[18];
-  lbfluid[1][9][next[9]] = m[0] + m[1] - m[2] + m[4] + 2. * m[6] - m[7] +
-                           m[10] - m[11] + m[13] - m[14] + m[16] + 2. * m[18];
-  lbfluid[1][10][next[10]] = m[0] - m[1] + m[2] + m[4] + 2. * m[6] - m[7] -
-                             m[10] + m[11] - m[13] + m[14] + m[16] + 2. * m[18];
-  lbfluid[1][11][next[11]] = m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8] +
-                             m[10] + m[12] - m[13] + m[15] + m[16] + m[17] -
-                             m[18];
-  lbfluid[1][12][next[12]] = m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8] -
-                             m[10] - m[12] + m[13] - m[15] + m[16] + m[17] -
-                             m[18];
-  lbfluid[1][13][next[13]] = m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8] +
-                             m[10] - m[12] - m[13] - m[15] + m[16] + m[17] -
-                             m[18];
-  lbfluid[1][14][next[14]] = m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8] -
-                             m[10] + m[12] + m[13] + m[15] + m[16] + m[17] -
-                             m[18];
-  lbfluid[1][15][next[15]] = m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9] +
-                             m[11] + m[12] - m[14] - m[15] + m[16] - m[17] -
-                             m[18];
-  lbfluid[1][16][next[16]] = m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9] -
-                             m[11] - m[12] + m[14] + m[15] + m[16] - m[17] -
-                             m[18];
-  lbfluid[1][17][next[17]] = m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9] +
-                             m[11] - m[12] - m[14] + m[15] + m[16] - m[17] -
-                             m[18];
-  lbfluid[1][18][next[18]] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9] -
-                             m[11] + m[12] + m[14] - m[15] + m[16] - m[17] -
-                             m[18];
+  lbfluid[5][next[5]] = m[0] + m[3] - 2. * (m[6] + m[12] + m[16] - m[18]);
+  lbfluid[6][next[6]] = m[0] - m[3] - 2. * (m[6] - m[12] + m[16] - m[18]);
+  lbfluid[7][next[7]] = m[0] + m[1] + m[2] + m[4] + 2. * m[6] + m[7] + m[10] +
+                        m[11] + m[13] + m[14] + m[16] + 2. * m[18];
+  lbfluid[8][next[8]] = m[0] - m[1] - m[2] + m[4] + 2. * m[6] + m[7] - m[10] -
+                        m[11] - m[13] - m[14] + m[16] + 2. * m[18];
+  lbfluid[9][next[9]] = m[0] + m[1] - m[2] + m[4] + 2. * m[6] - m[7] + m[10] -
+                        m[11] + m[13] - m[14] + m[16] + 2. * m[18];
+  lbfluid[10][next[10]] = m[0] - m[1] + m[2] + m[4] + 2. * m[6] - m[7] - m[10] +
+                          m[11] - m[13] + m[14] + m[16] + 2. * m[18];
+  lbfluid[11][next[11]] = m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8] +
+                          m[10] + m[12] - m[13] + m[15] + m[16] + m[17] - m[18];
+  lbfluid[12][next[12]] = m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8] -
+                          m[10] - m[12] + m[13] - m[15] + m[16] + m[17] - m[18];
+  lbfluid[13][next[13]] = m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8] +
+                          m[10] - m[12] - m[13] - m[15] + m[16] + m[17] - m[18];
+  lbfluid[14][next[14]] = m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8] -
+                          m[10] + m[12] + m[13] + m[15] + m[16] + m[17] - m[18];
+  lbfluid[15][next[15]] = m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9] +
+                          m[11] + m[12] - m[14] - m[15] + m[16] - m[17] - m[18];
+  lbfluid[16][next[16]] = m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9] -
+                          m[11] - m[12] + m[14] + m[15] + m[16] - m[17] - m[18];
+  lbfluid[17][next[17]] = m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9] +
+                          m[11] - m[12] - m[14] + m[15] + m[16] - m[17] - m[18];
+  lbfluid[18][next[18]] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9] -
+                          m[11] + m[12] + m[14] - m[15] + m[16] - m[17] - m[18];
 
   /* weights enter in the back transformation */
   for (int i = 0; i < lbmodel.n_veloc; i++)
-    lbfluid[1][i][next[i]] *= lbmodel.w[i];
+    lbfluid[i][next[i]] *= lbmodel.w[i];
 }
 
 /* Collisions and streaming (push scheme) */
@@ -2588,7 +2518,7 @@ inline void lb_collide_stream() {
           lb_reset_force_densities(index);
 
           /* transform back to populations and streaming */
-          lb_calc_n_from_modes_push(index, modes);
+          lb_calc_n_from_modes_push(lbfluid_post, index, modes);
         }
 
         ++index; /* next node */
@@ -2599,15 +2529,15 @@ inline void lb_collide_stream() {
   }
 
   /* exchange halo regions */
-  halo_push_communication();
+  halo_push_communication(lbfluid_post);
 
 #ifdef LB_BOUNDARIES
   /* boundary conditions for links */
-  LBBoundaries::lb_bounce_back();
+  LBBoundaries::lb_bounce_back(lbfluid_post);
 #endif // LB_BOUNDARIES
 
   /* swap the pointers for old and new population fields */
-  std::swap(lbfluid[0], lbfluid[1]);
+  std::swap(lbfluid, lbfluid_post);
 
   /* halo region is invalid after update */
   lbpar.resend_halo = 1;
@@ -2636,6 +2566,21 @@ void lattice_boltzmann_update() {
   }
 }
 
+/** Resets the forces on the fluid nodes */
+void lb_reinit_force_densities() {
+  for (Lattice::index_t index = 0; index < lblattice.halo_grid_volume;
+
+       index++) {
+    lb_reset_force_densities(index);
+  }
+#ifdef LB_BOUNDARIES
+  for (auto it = LBBoundaries::lbboundaries.begin();
+       it != LBBoundaries::lbboundaries.end(); ++it) {
+    (**it).reset_force();
+  }
+#endif // LB_BOUNDARIES
+}
+
 /***********************************************************************/
 /** \name Coupling part */
 /***********************************************************************/
@@ -2654,13 +2599,24 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   double delta[6];
   double *local_f, interpolated_u[3], delta_j[3];
 
+#ifdef EXTERNAL_FORCES
+  if (!(p->p.ext_flag & COORD_FIXED(0)) && !(p->p.ext_flag & COORD_FIXED(1)) &&
+      !(p->p.ext_flag & COORD_FIXED(2))) {
+    ONEPART_TRACE(if (p->p.identity == check_id) {
+      fprintf(stderr, "%d: OPT: f = (%.3e,%.3e,%.3e)\n", this_node, p->f.f[0],
+              p->f.f[1], p->f.f[2]);
+    });
+  }
+#endif
+
   /* determine elementary lattice cell surrounding the particle
      and the relative position of the particle in this cell */
   lblattice.map_position_to_lattice(p->r.p, node_index, delta);
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
-    fprintf(stderr, "%d: OPT: LB delta=(%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) "
-                    "pos=(%.3f,%.3f,%.3f)\n",
+    fprintf(stderr,
+            "%d: OPT: LB delta=(%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) "
+            "pos=(%.3f,%.3f,%.3f)\n",
             this_node, delta[0], delta[1], delta[2], delta[3], delta[4],
             delta[5], p->r.p[0], p->r.p[1], p->r.p[2]);
   });
@@ -2745,7 +2701,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
     }
   }
 
-// map_position_to_lattice: position ... not inside a local plaquette in ...
+  // map_position_to_lattice: position ... not inside a local plaquette in ...
 
 #ifdef ENGINE
   if (p->swim.swimming) {
@@ -2945,7 +2901,7 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v) {
  * halo regions before treating the ghost particles. Moreover, after
  * determining the ghost couplings, we have to communicate back the
  * halo region such that all local lattice nodes have the correct values.
- * Thus two communication phass are involved which will most likely be
+ * Thus two communication phases are involved which will most likely be
  * the bottleneck of the computation.
  *
  * Another way of dealing with the particle lattice coupling is to
@@ -2970,10 +2926,10 @@ void calc_particle_lattice_ia() {
 
       /* exchange halo regions (for fluid-particle coupling) */
       halo_communication(&update_halo_comm,
-                         reinterpret_cast<char *>(**lbfluid));
+                         reinterpret_cast<char *>(lbfluid[0].data()));
 
 #ifdef ADDITIONAL_CHECKS
-      lb_check_halo_regions();
+      lb_check_halo_regions(lbfluid);
 #endif
 
       /* halo is valid now */
@@ -3095,6 +3051,21 @@ void calc_particle_lattice_ia() {
 
   /*@}*/
 
+  /*@}*/
+  void print_fluid() {
+    for (int x = 0; x < lblattice.halo_grid[0]; ++x) {
+      for (int y = 0; y < lblattice.halo_grid[1]; ++y) {
+        for (int z = 0; z < lblattice.halo_grid[2]; ++z) {
+          int index = get_linear_index(x, y, z, lblattice.halo_grid);
+          for (int p = 0; p < lbmodel.n_veloc; ++p) {
+            printf("x %d y %d z %d pop %d: %f\n", x, y, z, p,
+                   lbfluid[p][index]);
+          }
+        }
+      }
+    }
+  }
+
   static int compare_buffers(double *buf1, double *buf2, int size) {
     int ret;
     if (memcmp(buf1, buf2, size) != 0) {
@@ -3110,7 +3081,7 @@ void calc_particle_lattice_ia() {
       This function can be used as an additional check. It test whether the
       halo regions have been exchanged correctly.
   */
-  void lb_check_halo_regions() {
+  void lb_check_halo_regions(const LB_Fluid &lbfluid) {
     Lattice::index_t index;
     int i, x, y, z, s_node, r_node, count = lbmodel.n_veloc;
     double *s_buffer, *r_buffer;
@@ -3124,7 +3095,7 @@ void calc_particle_lattice_ia() {
         for (y = 0; y < lblattice.halo_grid[1]; ++y) {
           index = get_linear_index(0, y, z, lblattice.halo_grid);
           for (i = 0; i < lbmodel.n_veloc; i++)
-            s_buffer[i] = lbfluid[1][i][index];
+            s_buffer[i] = lbfluid[i][index];
 
           s_node = node_neighbors[1];
           r_node = node_neighbors[0];
@@ -3135,13 +3106,13 @@ void calc_particle_lattice_ia() {
             index =
                 get_linear_index(lblattice.grid[0], y, z, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              s_buffer[i] = lbfluid[1][i][index];
+              s_buffer[i] = lbfluid[i][index];
             compare_buffers(s_buffer, r_buffer, count * sizeof(double));
           } else {
             index =
                 get_linear_index(lblattice.grid[0], y, z, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              r_buffer[i] = lbfluid[1][i][index];
+              r_buffer[i] = lbfluid[i][index];
             if (compare_buffers(s_buffer, r_buffer, count * sizeof(double))) {
               std::cerr << "buffers differ in dir=" << 0
                         << " at index=" << index << " y=" << y << " z=" << z
@@ -3152,7 +3123,7 @@ void calc_particle_lattice_ia() {
           index = get_linear_index(lblattice.grid[0] + 1, y, z,
                                    lblattice.halo_grid);
           for (i = 0; i < lbmodel.n_veloc; i++)
-            s_buffer[i] = lbfluid[1][i][index];
+            s_buffer[i] = lbfluid[i][index];
 
           s_node = node_neighbors[0];
           r_node = node_neighbors[1];
@@ -3162,12 +3133,12 @@ void calc_particle_lattice_ia() {
                          comm_cart, status);
             index = get_linear_index(1, y, z, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              s_buffer[i] = lbfluid[1][i][index];
+              s_buffer[i] = lbfluid[i][index];
             compare_buffers(s_buffer, r_buffer, count * sizeof(double));
           } else {
             index = get_linear_index(1, y, z, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              r_buffer[i] = lbfluid[1][i][index];
+              r_buffer[i] = lbfluid[i][index];
             if (compare_buffers(s_buffer, r_buffer, count * sizeof(double))) {
               std::cerr << "buffers differ in dir=0 at index=" << index
                         << " y=" << y << " z=" << z << "\n";
@@ -3182,7 +3153,7 @@ void calc_particle_lattice_ia() {
         for (x = 0; x < lblattice.halo_grid[0]; ++x) {
           index = get_linear_index(x, 0, z, lblattice.halo_grid);
           for (i = 0; i < lbmodel.n_veloc; i++)
-            s_buffer[i] = lbfluid[1][i][index];
+            s_buffer[i] = lbfluid[i][index];
 
           s_node = node_neighbors[3];
           r_node = node_neighbors[2];
@@ -3193,13 +3164,13 @@ void calc_particle_lattice_ia() {
             index =
                 get_linear_index(x, lblattice.grid[1], z, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              s_buffer[i] = lbfluid[1][i][index];
+              s_buffer[i] = lbfluid[i][index];
             compare_buffers(s_buffer, r_buffer, count * sizeof(double));
           } else {
             index =
                 get_linear_index(x, lblattice.grid[1], z, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              r_buffer[i] = lbfluid[1][i][index];
+              r_buffer[i] = lbfluid[i][index];
             if (compare_buffers(s_buffer, r_buffer, count * sizeof(double))) {
               std::cerr << "buffers differ in dir=1 at index=" << index
                         << " x=" << x << " z=" << z << "\n";
@@ -3210,7 +3181,7 @@ void calc_particle_lattice_ia() {
           index = get_linear_index(x, lblattice.grid[1] + 1, z,
                                    lblattice.halo_grid);
           for (i = 0; i < lbmodel.n_veloc; i++)
-            s_buffer[i] = lbfluid[1][i][index];
+            s_buffer[i] = lbfluid[i][index];
 
           s_node = node_neighbors[2];
           r_node = node_neighbors[3];
@@ -3220,12 +3191,12 @@ void calc_particle_lattice_ia() {
                          comm_cart, status);
             index = get_linear_index(x, 1, z, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              s_buffer[i] = lbfluid[1][i][index];
+              s_buffer[i] = lbfluid[i][index];
             compare_buffers(s_buffer, r_buffer, count * sizeof(double));
           } else {
             index = get_linear_index(x, 1, z, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              r_buffer[i] = lbfluid[1][i][index];
+              r_buffer[i] = lbfluid[i][index];
             if (compare_buffers(s_buffer, r_buffer, count * sizeof(double))) {
               std::cerr << "buffers differ in dir=1 at index=" << index
                         << " x=" << x << " z=" << z << "\n";
@@ -3240,7 +3211,7 @@ void calc_particle_lattice_ia() {
         for (x = 0; x < lblattice.halo_grid[0]; ++x) {
           index = get_linear_index(x, y, 0, lblattice.halo_grid);
           for (i = 0; i < lbmodel.n_veloc; i++)
-            s_buffer[i] = lbfluid[1][i][index];
+            s_buffer[i] = lbfluid[i][index];
 
           s_node = node_neighbors[5];
           r_node = node_neighbors[4];
@@ -3251,13 +3222,13 @@ void calc_particle_lattice_ia() {
             index =
                 get_linear_index(x, y, lblattice.grid[2], lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              s_buffer[i] = lbfluid[1][i][index];
+              s_buffer[i] = lbfluid[i][index];
             compare_buffers(s_buffer, r_buffer, count * sizeof(double));
           } else {
             index =
                 get_linear_index(x, y, lblattice.grid[2], lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              r_buffer[i] = lbfluid[1][i][index];
+              r_buffer[i] = lbfluid[i][index];
             if (compare_buffers(s_buffer, r_buffer, count * sizeof(double))) {
               std::cerr << "buffers differ in dir=2 at index=" << index
                         << " x=" << x << " y=" << y
@@ -3271,7 +3242,7 @@ void calc_particle_lattice_ia() {
           index = get_linear_index(x, y, lblattice.grid[2] + 1,
                                    lblattice.halo_grid);
           for (i = 0; i < lbmodel.n_veloc; i++)
-            s_buffer[i] = lbfluid[1][i][index];
+            s_buffer[i] = lbfluid[i][index];
 
           s_node = node_neighbors[4];
           r_node = node_neighbors[5];
@@ -3281,12 +3252,12 @@ void calc_particle_lattice_ia() {
                          comm_cart, status);
             index = get_linear_index(x, y, 1, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              s_buffer[i] = lbfluid[1][i][index];
+              s_buffer[i] = lbfluid[i][index];
             compare_buffers(s_buffer, r_buffer, count * sizeof(double));
           } else {
             index = get_linear_index(x, y, 1, lblattice.halo_grid);
             for (i = 0; i < lbmodel.n_veloc; i++)
-              r_buffer[i] = lbfluid[1][i][index];
+              r_buffer[i] = lbfluid[i][index];
             if (compare_buffers(s_buffer, r_buffer, count * sizeof(double))) {
               std::cerr << "buffers differ in dir=2 at index=" << index
                         << " x=" << x << " y=" << y << "\n";
@@ -3298,317 +3269,6 @@ void calc_particle_lattice_ia() {
 
     free(r_buffer);
     free(s_buffer);
-
-    // if (check_runtime_errors());
-    // else fprintf(stderr,"halo check successful\n");
   }
-
-#if 0 /* These debug functions are used nowhere. If you need it, here they     \
-         are. Remove this comment line and the matching #endif. The functions  \
-         in question are: lb_lattice_sum lb_check_mode_transformation          \
-         lb_init_mode_transformation                                           \
-         lb_check_negative_n                                                   \
-      */
-#ifdef ADDITIONAL_CHECKS
-/** counts the occurences of negative populations due to fluctuations */
-static int failcounter=0;
-
-static void lb_lattice_sum() {
-
-    double *w   = lbmodel.w;
-    double (*v)[3]  = lbmodel.c;
-
-    //int n_veloc = 14;
-    //double w[14]    = { 7./18.,
-    //                    1./12., 1./12., 1./12., 1./12., 1./18.,
-    //                    1./36., 1./36., 1./36., 1./36.,
-    //                    1./36., 1./36., 1./36., 1./36. };
-    //double v[14][3] = { { 0., 0., 0. },
-    //                    { 1., 0., 0. },
-    //                    {-1., 0., 0. },
-    //                    { 0., 1., 0. },
-    //		        { 0.,-1., 0. },
-    //                    { 0., 0., 1. },
-    //                    { 1., 1., 0. },
-    //                    {-1.,-1., 0. },
-    //                    { 1.,-1., 0. },
-    //                    {-1., 1., 0. },
-    //                    { 1., 0., 1. },
-    //                    {-1., 0., 1. },
-    //                    { 0., 1., 1. },
-    //                    { 0.,-1., 1. } };
-
-    int i,a,b,c,d,e;
-    double sum1,sum2,sum3,sum4,sum5;
-    int count=0;
-
-    for (a = 0; a < 3; a++)
-    {
-        sum1 = 0.0;
-        for (i = 0; i < lbmodel.n_veloc; ++i) {
-            if (v[i][2] < 0) sum1 += w[i]*v[i][a];
-        }
-        if (fabs(sum1) > ROUND_ERROR_PREC) {
-            count++; fprintf(stderr,"(%d) %f\n",a,sum1);
-        }
-    }
-
-    for (a=0; a<3; a++)
-        for (b=0; b<3; b++)
-        {
-            sum2 = 0.0;
-            for (i=0; i<lbmodel.n_veloc; ++i) {
-                if (v[i][2] < 0) sum2 += w[i]*v[i][a]*v[i][b];
-            }
-            if (sum2!=0.0) {
-                count++; fprintf(stderr,"(%d,%d) %f\n",a,b,sum2);
-            }
-        }
-
-    for (a=0; a<3; a++)
-        for (b=0; b<3; b++)
-            for (c=0; c<3; c++)
-            {
-                sum3 = 0.0;
-                for (i=0; i<lbmodel.n_veloc; ++i) {
-                    if (v[i][2] < 0) sum3 += w[i]*v[i][a]*v[i][b]*v[i][c];
-                }
-                if (sum3!=0.0) {
-                    count++; fprintf(stderr,"(%d,%d,%d) %f\n",a,b,c,sum3);
-                }
-            }
-
-    for (a=0; a<3; a++)
-        for (b=0; b<3; b++)
-            for (c=0; c<3; c++)
-                for (d=0; d<3; d++)
-                {
-                    sum4 = 0.0;
-                    for (i=0; i<lbmodel.n_veloc; ++i) {
-                        if (v[i][2] < 0) sum4 += w[i]*v[i][a]*v[i][b]*v[i][c]*v[i][d];
-                    }
-                    if (fabs(sum4) > ROUND_ERROR_PREC) {
-                        count++; fprintf(stderr,"(%d,%d,%d,%d) %f\n",a,b,c,d,sum4);
-                    }
-                }
-
-    for (a=0; a<3; a++)
-        for (b=0; b<3; b++)
-            for (c=0; c<3; c++)
-                for (d=0; d<3; d++)
-                    for (e=0; e<3; e++)
-                    {
-                        sum5 = 0.0;
-                        for (i=0; i<lbmodel.n_veloc; ++i) {
-                            if (v[i][2] < 0) sum5 += w[i]*v[i][a]*v[i][b]*v[i][c]*v[i][d]*v[i][e];
-                        }
-                        if (fabs(sum5) > ROUND_ERROR_PREC) {
-                            count++; fprintf(stderr,"(%d,%d,%d,%d,%d) %f\n",a,b,c,d,e,sum5);
-                        }
-                    }
-
-    fprintf(stderr,"%d non-null entries\n",count);
-
-}
-#endif /* #ifdef ADDITIONAL_CHECKS */
-
-#ifdef ADDITIONAL_CHECKS
-static void lb_check_mode_transformation(Lattice::index_t index, double *mode) {
-    /* check if what I think is right */
-    int i;
-    double *w = lbmodel.w;
-    double (*e)[19] = d3q19_modebase;
-    double sum_n=0.0, sum_m=0.0;
-    double n_eq[19];
-    double m_eq[19];
-    // unit conversion: mass density
-    double avg_rho = lbpar.rho*lbpar.agrid*lbpar.agrid*lbpar.agrid;
-    double (*c)[3] = lbmodel.c;
-
-    m_eq[0] = mode[0];
-    m_eq[1] = mode[1];
-    m_eq[2] = mode[2];
-    m_eq[3] = mode[3];
-
-    double rho = mode[0] + avg_rho;
-    double *j  = mode+1;
-
-    /* equilibrium part of the stress modes */
-    /* remember that the modes have (\todo not?) been normalized! */
-    m_eq[4] = /*1./6.*/scalar(j,j)/rho;
-    m_eq[5] = /*1./4.*/(Utils::sqr(j[0])-Utils::sqr(j[1]))/rho;
-    m_eq[6] = /*1./12.*/(scalar(j,j) - 3.0*Utils::sqr(j[2]))/rho;
-    m_eq[7] = j[0]*j[1]/rho;
-    m_eq[8] = j[0]*j[2]/rho;
-    m_eq[9] = j[1]*j[2]/rho;
-
-    for (i=10;i<lbmodel.n_veloc;i++) {
-        m_eq[i] = 0.0;
-    }
-
-    for (i=0;i<lbmodel.n_veloc;i++) {
-        n_eq[i] = w[i]*((rho-avg_rho) + 3.*scalar(j,c[i]) + 9./2.*Utils::sqr(scalar(j,c[i]))/rho - 3./2.*scalar(j,j)/rho);
-    }
-
-    for (i=0;i<lbmodel.n_veloc;i++) {
-        sum_n += Utils::sqr(lbfluid[1][i][index]-n_eq[i])/w[i];
-        sum_m += Utils::sqr(mode[i]-m_eq[i])/e[19][i];
-    }
-
-    if (fabs(sum_n-sum_m)>ROUND_ERROR_PREC) {
-        fprintf(stderr,"Attention: sum_n=%f sum_m=%f %e\n",sum_n,sum_m,fabs(sum_n-sum_m));
-    }
-}
-
-static void lb_init_mode_transformation() {
-    int i, j, k, l;
-    int n_veloc = 14;
-    double w[14]    = { 7./18.,
-                        1./12., 1./12., 1./12., 1./12., 1./18.,
-                        1./36., 1./36., 1./36., 1./36.,
-                        1./36., 1./36., 1./36., 1./36. };
-    double c[14][3] = { { 0., 0., 0. },
-                        { 1., 0., 0. },
-                        {-1., 0., 0. },
-                        { 0., 1., 0. },
-                        { 0.,-1., 0. },
-                        { 0., 0., 1. },
-                        { 1., 1., 0. },
-                        {-1.,-1., 0. },
-                        { 1.,-1., 0. },
-                        {-1., 1., 0. },
-                        { 1., 0., 1. },
-                        {-1., 0., 1. },
-                        { 0., 1., 1. },
-                        { 0.,-1., 1. } };
-
-    double b[19][14];
-    double e[14][14];
-    double proj, norm[14];
-
-    /* construct polynomials from the discrete velocity vectors */
-    for (i=0;i<n_veloc;i++) {
-        b[0][i]  = 1;
-        b[1][i]  = c[i][0];
-        b[2][i]  = c[i][1];
-        b[3][i]  = c[i][2];
-        b[4][i]  = scalar(c[i],c[i]);
-        b[5][i]  = c[i][0]*c[i][0]-c[i][1]*c[i][1];
-        b[6][i]  = scalar(c[i],c[i])-3*c[i][2]*c[i][2];
-        //b[5][i]  = 3*c[i][0]*c[i][0]-scalar(c[i],c[i]);
-        //b[6][i]  = c[i][1]*c[i][1]-c[i][2]*c[i][2];
-        b[7][i]  = c[i][0]*c[i][1];
-        b[8][i]  = c[i][0]*c[i][2];
-        b[9][i]  = c[i][1]*c[i][2];
-        b[10][i] = 3*scalar(c[i],c[i])*c[i][0];
-        b[11][i] = 3*scalar(c[i],c[i])*c[i][1];
-        b[12][i] = 3*scalar(c[i],c[i])*c[i][2];
-        b[13][i] = (c[i][1]*c[i][1]-c[i][2]*c[i][2])*c[i][0];
-        b[14][i] = (c[i][0]*c[i][0]-c[i][2]*c[i][2])*c[i][1];
-        b[15][i] = (c[i][0]*c[i][0]-c[i][1]*c[i][1])*c[i][2];
-        b[16][i] = 3*scalar(c[i],c[i])*scalar(c[i],c[i]);
-        b[17][i] = 2*scalar(c[i],c[i])*b[5][i];
-        b[18][i] = 2*scalar(c[i],c[i])*b[6][i];
-    }
-
-    for (i=0;i<n_veloc;i++) {
-        b[0][i]  = 1;
-        b[1][i]  = c[i][0];
-        b[2][i]  = c[i][1];
-        b[3][i]  = c[i][2];
-        b[4][i]  = scalar(c[i],c[i]);
-        b[5][i]  = Utils::sqr(c[i][0])-Utils::sqr(c[i][1]);
-        b[6][i]  = c[i][0]*c[i][1];
-        b[7][i]  = c[i][0]*c[i][2];
-        b[8][i]  = c[i][1]*c[i][2];
-        b[9][i]  = scalar(c[i],c[i])*c[i][0];
-        b[10][i] = scalar(c[i],c[i])*c[i][1];
-        b[11][i] = scalar(c[i],c[i])*c[i][2];
-        b[12][i] = (c[i][0]*c[i][0]-c[i][1]*c[i][1])*c[i][2];
-        b[13][i] = scalar(c[i],c[i])*scalar(c[i],c[i]);
-    }
-
-    /* Gram-Schmidt orthogonalization procedure */
-    for (j=0;j<n_veloc;j++) {
-        for (i=0;i<n_veloc;i++) e[j][i] = b[j][i];
-        for (k=0;k<j;k++) {
-            proj = 0.0;
-            for (l=0;l<n_veloc;l++) {
-                proj += w[l]*e[k][l]*b[j][l];
-            }
-            if (j==13) fprintf(stderr,"%d %f\n",k,proj/norm[k]);
-            for (i=0;i<n_veloc;i++) e[j][i] -= proj/norm[k]*e[k][i];
-        }
-        norm[j] = 0.0;
-        for (i=0;i<n_veloc;i++) norm[j] += w[i]*Utils::sqr(e[j][i]);
-    }
-
-    fprintf(stderr,"e[%d][%d] = {\n",n_veloc,n_veloc);
-    for (i=0;i<n_veloc;i++) {
-        fprintf(stderr,"{ % .3f",e[i][0]);
-        for (j=1;j<n_veloc;j++) {
-            fprintf(stderr,", % .3f",e[i][j]);
-        }
-        fprintf(stderr," } %.9f\n",norm[i]);
-    }
-    fprintf(stderr,"};\n");
-
-    /* projections on lattice tensors */
-    for (i=0;i<n_veloc;i++) {
-        proj = 0.0;
-        for (k=0;k<n_veloc;k++) {
-            proj += e[i][k] * w[k] * 1;
-        }
-        fprintf(stderr, "%.6f",proj);
-
-        for (j=0;j<3;j++) {
-            proj = 0.0;
-            for (k=0;k<n_veloc;k++) {
-                proj += e[i][k] * w[k] * c[k][j];
-            }
-            fprintf(stderr, " %.6f",proj);
-        }
-
-        for (j=0;j<3;j++) {
-            for (k=0;k<3;k++) {
-                proj=0.0;
-                for (l=0;l<n_veloc;l++) {
-                    proj += e[i][l] * w[l] * c[l][j] * c[l][k];
-                }
-                fprintf(stderr, " %.6f",proj);
-            }
-        }
-
-        fprintf(stderr,"\n");
-
-    }
-}
-#endif /* ADDITIONAL_CHECKS */
-
-#ifdef ADDITIONAL_CHECKS
-/** Check for negative populations.
-
-    Checks for negative populations and increases failcounter for each
-    occurence.
-
-    @param  index Index of the local lattice site (Input).
-    @return Number of negative populations on the local lattice site. */
-static int lb_check_negative_n(Lattice::index_t index)
-{
-    int i, localfails=0;
-
-    for (i=0; i<n_veloc; i++) {
-        if (lbfluid[1][i][index]+lbmodel.coeff[i][0]*lbpar.rho < 0.0) {
-            ++localfails;
-            ++failcounter;
-            fprintf(stderr,"%d: Negative population n[%d]=%le (failcounter=%d, rancounter=%d).\n   Check your parameters if this occurs too often!\n",this_node,i,lbmodel.coeff[i][0]*lbpar.rho+lbfluid[1][i][index],failcounter,rancounter);
-            break;
-        }
-    }
-    return localfails;
-}
-#endif /* ADDITIONAL_CHECKS */
-#endif /* #if 0 */
-/* Here, the unused "ADDITIONAL_CHECKS functions end. */
 
 #endif // LB

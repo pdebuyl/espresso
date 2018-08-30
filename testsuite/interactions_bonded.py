@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2013,2014,2015,2016 The ESPResSo project
+# Copyright (C) 2013-2018 The ESPResSo project
 #
 # This file is part of ESPResSo.
 #
@@ -17,9 +17,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 from __future__ import print_function
-import espressomd
-import numpy
+
 import unittest as ut
+import numpy
+
+import espressomd
 from tests_common import *
 
 
@@ -48,17 +50,6 @@ class InteractionsBondedTest(ut.TestCase):
 
         self.system.part.clear()
 
-    # Required, since assertAlmostEqual does NOT check significant places
-    def assertFractionAlmostEqual(self, a, b, places=10):
-        if abs(b) < 1E-8:
-            self.assertAlmostEqual(a, b)
-        else:
-            self.assertAlmostEqual(a / b, 1.)
-
-    def assertItemsFractionAlmostEqual(self, a, b):
-        for i, ai in enumerate(a):
-            self.assertFractionAlmostEqual(ai, b[i])
-
     # Test Harmonic Bond
     def test_harmonic(self):
 
@@ -85,14 +76,15 @@ class InteractionsBondedTest(ut.TestCase):
             f1_sim = self.system.part[1].f
             f1_ref = self.axis * \
                 harmonic_force(scalar_r=(i + 1) * self.step_width,
-                                    k=hb_k, r_0=hb_r_0, r_cut=hb_r_cut)
+                               k=hb_k, r_0=hb_r_0, r_cut=hb_r_cut)
 
             # Check that energies match, ...
-            self.assertFractionAlmostEqual(E_sim, E_ref)
+            np.testing.assert_almost_equal(E_sim, E_ref)
             # force equals minus the counter-force  ...
             self.assertTrue((f0_sim == -f1_sim).all())
             # and has correct value.
-            self.assertItemsFractionAlmostEqual(f1_sim, f1_ref)
+            f1_sim_copy = np.copy(f1_sim)
+            np.testing.assert_almost_equal(f1_sim_copy, f1_ref)
 
         # Check that bond breaks when distance > r_cut
         self.system.part[1].pos = self.system.part[1].pos + self.step
@@ -125,21 +117,58 @@ class InteractionsBondedTest(ut.TestCase):
             f1_sim = self.system.part[1].f
             f1_ref = self.axis * \
                 fene_force(scalar_r=(i + 1) * self.step_width,
-                                k=fene_k, d_r_max=fene_d_r_max, r_0=fene_r_0)
+                           k=fene_k, d_r_max=fene_d_r_max, r_0=fene_r_0)
 
             # Check that energies match, ...
-            self.assertFractionAlmostEqual(E_sim, E_ref)
+            np.testing.assert_almost_equal(E_sim, E_ref)
             # force equals minus the counter-force  ...
             self.assertTrue((f0_sim == -f1_sim).all())
             # and has correct value.
-            self.assertItemsFractionAlmostEqual(f1_sim, f1_ref)
+            f1_sim_copy = np.copy(f1_sim)
+            np.testing.assert_almost_equal(f1_sim_copy, f1_ref, decimal=5)
 
         # Check that bond breaks when distance > r_cut
         self.system.part[1].pos = self.system.part[1].pos + self.step
         with self.assertRaisesRegexp(Exception, "Encoutered errors during integrate"):
             self.system.integrator.run(recalc_forces=True, steps=0)
 
+    @ut.skipIf(not espressomd.has_features(["ELECTROSTATICS"]),
+               "ELECTROSTATICS feature is not available, skipping coulomb test.")
+    def test_coulomb(self):
+        coulomb_k = 1
+        q1 = 1
+        q2 = -1
+        self.system.part[0].q = q1
+        self.system.part[1].q = q2
+
+        coulomb = espressomd.interactions.BondedCoulomb(prefactor=coulomb_k)
+        self.system.bonded_inter.add(coulomb)
+        self.system.part[0].add_bond((coulomb, 1))
+
+        for i in range(445):
+            self.system.part[1].pos = self.system.part[1].pos + self.step
+            self.system.integrator.run(recalc_forces=True, steps=0)
+
+            # Calculate energies
+            E_sim = self.system.analysis.energy()["bonded"]
+            E_ref = coulomb_potential(
+                scalar_r=(i + 1) * self.step_width, k=coulomb_k, q1=q1, q2=q2)
+
+            # Calculate forces
+            f0_sim = self.system.part[0].f
+            f1_sim = self.system.part[1].f
+            f1_ref = self.axis * coulomb_force(
+                scalar_r=(i + 1) * self.step_width,
+                                k=coulomb_k, q1=q1, q2=q2)
+
+            # Check that energies match, ...
+            np.testing.assert_almost_equal(E_sim, E_ref)
+            # force equals minus the counter-force  ...
+            self.assertTrue((f0_sim == -f1_sim).all())
+            # and has correct value.
+            f1_sim_copy = np.copy(f1_sim)
+            np.testing.assert_almost_equal(f1_sim_copy, f1_ref)
+
 
 if __name__ == '__main__':
-    print("Features: ", espressomd.features())
     ut.main()

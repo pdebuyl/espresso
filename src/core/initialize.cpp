@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
+  Copyright (C) 2010-2018 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
 
@@ -108,9 +108,6 @@ void on_program_start() {
   if (this_node == 0) {
     //   lb_pre_init_gpu();
   }
-#endif
-#ifdef LB
-  lb_pre_init();
 #endif
 
 #ifdef SWIMMER_REACTIONS
@@ -406,7 +403,6 @@ void on_constraint_change() {
 void on_lbboundary_change() {
   EVENT_TRACE(fprintf(stderr, "%d: on_lbboundary_change\n", this_node));
   invalidate_obs();
-  
 
 #ifdef LB_BOUNDARIES
   if (lattice_switch & LATTICE_LB) {
@@ -606,6 +602,7 @@ void on_parameter_change(int field) {
     break;
   case FIELD_SKIN:
     cells_on_geometry_change(0);
+    break;
   case FIELD_PERIODIC:
 #ifdef SCAFACOS
 #ifdef ELECTROSTATICS
@@ -629,6 +626,7 @@ void on_parameter_change(int field) {
   case FIELD_MINNUMCELLS:
   case FIELD_MAXNUMCELLS:
     cells_re_init(CELL_STRUCTURE_CURRENT);
+    break;
   case FIELD_TEMPERATURE:
     on_temperature_change();
     reinit_thermo = 1;

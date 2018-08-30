@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2013,2014,2015,2016 The ESPResSo project
+# Copyright (C) 2013-2018 The ESPResSo project
 #
 # This file is part of ESPResSo.
 #
@@ -180,7 +180,7 @@ cdef extern from "lees_edwards.hpp":
 cdef extern from "immersed_boundaries.hpp":
     extern ImmersedBoundaries immersed_boundaries
 
-cdef extern from "object-in-fluid/oif_global_forces.hpp": 
+cdef extern from "object-in-fluid/oif_global_forces.hpp":
     int max_oif_objects
 
 cdef extern from "forcecap.hpp":

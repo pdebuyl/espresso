@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2012,2013,2014,2015,2016 The ESPResSo project
+  Copyright (C) 2010-2018 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
 
@@ -184,8 +184,9 @@ static void topology_release(int cs) {
     //cd_topology_release();
     break;
   default:
-    fprintf(stderr, "INTERNAL ERROR: attempting to sort the particles in an "
-                    "unknown way (%d)\n",
+    fprintf(stderr,
+            "INTERNAL ERROR: attempting to sort the particles in an "
+            "unknown way (%d)\n",
             cs);
     errexit();
   }
@@ -216,8 +217,9 @@ void topology_init(int cs, CellPList *local) {
     //cd_topology_init(local);
     break;
   default:
-    fprintf(stderr, "INTERNAL ERROR: attempting to sort the particles in an "
-                    "unknown way (%d)\n",
+    fprintf(stderr,
+            "INTERNAL ERROR: attempting to sort the particles in an "
+            "unknown way (%d)\n",
             cs);
     errexit();
   }

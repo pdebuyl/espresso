@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
+  Copyright (C) 2010-2018 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
   Max-Planck-Institute for Polymer Research, Theory Group
 
@@ -30,15 +30,17 @@
 #include "grid.hpp"
 #include "initialize.hpp"
 #include "interaction_data.hpp"
-#include "lattice.hpp" 
+#include "lattice.hpp"
 #include "layered.hpp"
 #include "npt.hpp"
+#include "object-in-fluid/oif_global_forces.hpp"
 #include "rattle.hpp"
 #include "thermalized_bond.hpp"
 #include "tuning.hpp"
 #include "utils/mpi/all_compare.hpp"
+#ifdef LEES_EDWARDS
 #include "lees_edwards.hpp"
-#include "object-in-fluid/oif_global_forces.hpp" 
+#endif
 
 #include <boost/functional/hash.hpp>
 
@@ -70,21 +72,21 @@ typedef struct {
 
 const std::unordered_map<int, Datafield> fields{
     {FIELD_BOXL,
-      {box_l, Datafield::Type::DOUBLE, 3, "box_l"}}, /* 0  from grid.cpp */
-     {FIELD_CELLGRID,
-      {dd.cell_grid, Datafield::Type::INT, 3,
-       "cell_grid"}}, /* 1  from cells.cpp */
-     {FIELD_CELLSIZE,
-      {dd.cell_size, Datafield::Type::DOUBLE, 3,
-       "cell_size"}}, /* 2  from cells.cpp */
+     {box_l, Datafield::Type::DOUBLE, 3, "box_l"}}, /* 0  from grid.cpp */
+    {FIELD_CELLGRID,
+     {dd.cell_grid, Datafield::Type::INT, 3,
+      "cell_grid"}}, /* 1  from cells.cpp */
+    {FIELD_CELLSIZE,
+     {dd.cell_size, Datafield::Type::DOUBLE, 3,
+      "cell_size"}}, /* 2  from cells.cpp */
 #ifndef PARTICLE_ANISOTROPY
-     {FIELD_LANGEVIN_GAMMA,
-      {&langevin_gamma, Datafield::Type::DOUBLE, 1,
-       "gamma"}}, /* 5  from thermostat.cpp */
+    {FIELD_LANGEVIN_GAMMA,
+     {&langevin_gamma, Datafield::Type::DOUBLE, 1,
+      "gamma"}}, /* 5  from thermostat.cpp */
 #else
-     {FIELD_LANGEVIN_GAMMA,
-      {langevin_gamma.data(), Datafield::Type::DOUBLE, 3,
-       "gamma"}}, /* 5  from thermostat.cpp */
+    {FIELD_LANGEVIN_GAMMA,
+     {langevin_gamma.data(), Datafield::Type::DOUBLE, 3,
+      "gamma"}}, /* 5  from thermostat.cpp */
 #endif // PARTICLE_ANISOTROPY
 #ifdef LEES_EDWARDS
      {FIELD_LEES_EDWARDS,
@@ -206,24 +208,24 @@ const std::unordered_map<int, Datafield> fields{
       {&warnings, Datafield::Type::INT, 1, "warnings"
        }}, /* 50 from global.cpp */
 #ifndef PARTICLE_ANISOTROPY
-     {FIELD_LANGEVIN_GAMMA_ROTATION,
-      {&langevin_gamma_rotation, Datafield::Type::DOUBLE, 1,
-       "gamma_rot"}}, /* 55 from thermostat.cpp */
+    {FIELD_LANGEVIN_GAMMA_ROTATION,
+     {&langevin_gamma_rotation, Datafield::Type::DOUBLE, 1,
+      "gamma_rot"}}, /* 55 from thermostat.cpp */
 #else
-     {FIELD_LANGEVIN_GAMMA_ROTATION,
-      {langevin_gamma_rotation.data(), Datafield::Type::DOUBLE, 3,
-       "gamma_rot"}}, /* 55 from thermostat.cpp */
+    {FIELD_LANGEVIN_GAMMA_ROTATION,
+     {langevin_gamma_rotation.data(), Datafield::Type::DOUBLE, 3,
+      "gamma_rot"}}, /* 55 from thermostat.cpp */
 #endif
 #ifdef OIF_GLOBAL_FORCES
-     {FIELD_MAX_OIF_OBJECTS,
-       {&max_oif_objects, Datafield::Type::INT, 1, "max_oif_objects"}},
+    {FIELD_MAX_OIF_OBJECTS,
+     {&max_oif_objects, Datafield::Type::INT, 1, "max_oif_objects"}},
 #endif
-     {FIELD_THERMALIZEDBONDS,
-      {&n_thermalized_bonds, Datafield::Type::INT, 1,
-       "n_thermalized_bonds"}}, /* 56 from thermalized_bond.cpp */
-     {FIELD_FORCE_CAP, {&force_cap, Datafield::Type::DOUBLE, 1, "force_cap"}},
-     {FIELD_THERMO_VIRTUAL,
-      {&thermo_virtual, Datafield::Type::BOOL, 1, "thermo_virtual"}}};
+    {FIELD_THERMALIZEDBONDS,
+     {&n_thermalized_bonds, Datafield::Type::INT, 1,
+      "n_thermalized_bonds"}}, /* 56 from thermalized_bond.cpp */
+    {FIELD_FORCE_CAP, {&force_cap, Datafield::Type::DOUBLE, 1, "force_cap"}},
+    {FIELD_THERMO_VIRTUAL,
+     {&thermo_virtual, Datafield::Type::BOOL, 1, "thermo_virtual"}}};
 
 std::size_t hash_value(Datafield const &field) {
   using boost::hash_range;
@@ -234,7 +236,7 @@ std::size_t hash_value(Datafield const &field) {
     return hash_range(ptr, ptr + field.dimension);
   }
   case Datafield::Type::BOOL: {
-    auto ptr = reinterpret_cast<int *>(field.data);
+    auto ptr = reinterpret_cast<char *>(field.data);
     return hash_range(ptr, ptr + 1);
   }
   case Datafield::Type::DOUBLE: {
@@ -258,7 +260,9 @@ void common_bcast_parameter(int i) {
               comm_cart);
     break;
   case Datafield::Type::BOOL:
-    MPI_Bcast((int *)fields.at(i).data, 1, MPI_INT, 0, comm_cart);
+    static_assert(sizeof(bool) == sizeof(char),
+                  "bool datatype does not have the expected size");
+    MPI_Bcast((char *)fields.at(i).data, 1, MPI_CHAR, 0, comm_cart);
     break;
   case Datafield::Type::DOUBLE:
     MPI_Bcast((double *)fields.at(i).data, fields.at(i).dimension, MPI_DOUBLE,
@@ -275,7 +279,7 @@ void common_bcast_parameter(int i) {
 
   on_parameter_change(i);
 }
-}
+} // namespace
 
 int warnings = 1;
 

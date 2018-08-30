@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
+  Copyright (C) 2010-2018 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
 
@@ -23,7 +23,7 @@
  *
  *  For more information about the integrator
  *  see \ref integrate.hpp "integrate.hpp".
-*/
+ */
 
 #include "integrate.hpp"
 #include "accumulators.hpp"
@@ -59,7 +59,6 @@
 #include "forces.hpp"
 #include "immersed_boundaries.hpp"
 #include "npt.hpp"
-
 #ifdef LEES_EDWARDS
 #include "lees_edwards.hpp"
 #endif
@@ -191,8 +190,9 @@ void integrate_ensemble_init() {
     nptiso.inv_piston = 1 / (1.0 * nptiso.piston);
     nptiso.p_inst_av = 0.0;
     if (nptiso.dimension == 0) {
-      fprintf(stderr, "%d: INTERNAL ERROR: npt integrator was called but "
-                      "dimension not yet set. this should not happen. ",
+      fprintf(stderr,
+              "%d: INTERNAL ERROR: npt integrator was called but "
+              "dimension not yet set. this should not happen. ",
               this_node);
       errexit();
     }
@@ -249,7 +249,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 
 #ifdef LB
     transfer_momentum = 0;
-    if (lattice_switch & LATTICE_LB && this_node == 0)
+    if (lattice_switch & LATTICE_LB && this_node == 0 && n_part)
       runtimeWarning("Recalculating forces, so the LB coupling forces are not "
                      "included in the particle force the first time step. This "
                      "only matters if it happens frequently during "
@@ -257,7 +257,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #endif
 #ifdef LB_GPU
     transfer_momentum_gpu = 0;
-    if (lattice_switch & LATTICE_LB_GPU && this_node == 0)
+    if (lattice_switch & LATTICE_LB_GPU && this_node == 0 && n_part)
       runtimeWarning("Recalculating forces, so the LB coupling forces are not "
                      "included in the particle force the first time step. This "
                      "only matters if it happens frequently during "
@@ -332,7 +332,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #ifdef NEMD
         || nemd_method != NEMD_METHOD_OFF
 #endif
-        ) {
+    ) {
       propagate_vel();
       propagate_pos();
     } else if (integ_switch == INTEG_METHOD_STEEPEST_DESCENT) {
@@ -358,15 +358,15 @@ void integrate_vv(int n_steps, int reuse_forces) {
     }
 #endif
 
-/* Integration Step: Step 3 of Velocity Verlet scheme:
-   Calculate f(t+dt) as function of positions p(t+dt) ( and velocities
-   v(t+0.5*dt) ) */
+    /* Integration Step: Step 3 of Velocity Verlet scheme:
+       Calculate f(t+dt) as function of positions p(t+dt) ( and velocities
+       v(t+0.5*dt) ) */
 
 #ifdef LB
-    transfer_momentum = 1;
+    transfer_momentum = (n_part > 0);
 #endif
 #ifdef LB_GPU
-    transfer_momentum_gpu = 1;
+    transfer_momentum_gpu = (n_part > 0);
 #endif
 
     // Communication step: distribute ghost positions
