@@ -38,7 +38,9 @@
 #include "grid.hpp"
 #include "iccp3m.hpp" /* -iccp3m- */
 #include "lattice.hpp"
+#ifdef LEES_EDWARDS
 #include "lees_edwards.hpp"
+#endif
 #include "lb.hpp"
 #include "lbboundaries.hpp"
 #include "maggs.hpp"

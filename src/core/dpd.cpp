@@ -123,6 +123,7 @@ static double weight(int type, double r_cut, double dist_inv) {
   }
 }
 
+#ifdef LEES_EDWARDS
 static Vector3d vel_diff(Vector3d const &x, Vector3d const &y,
                          Vector3d const &u, Vector3d const &v) {
   auto shear_velocity = lees_edwards_protocol.velocity;
@@ -135,6 +136,7 @@ static Vector3d vel_diff(Vector3d const &x, Vector3d const &y,
 
   return ret;
 }
+#endif
 
 Vector3d dpd_pair_force(const Particle *p1, const Particle *p2,
                         IA_parameters *ia_params, double *d, double dist,

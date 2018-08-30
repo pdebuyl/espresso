@@ -243,11 +243,13 @@ std::size_t hash_value(Datafield const &field) {
     auto ptr = reinterpret_cast<double *>(field.data);
     return hash_range(ptr, ptr + field.dimension);
   }
-  case Datafield::Type::LEES_EDWARDS_MPI: {
+#ifdef LEES_EDWARDS
+case Datafield::Type::LEES_EDWARDS_MPI: {
     lees_edwards_protocol_struct * le_pointer;
     auto ptr = reinterpret_cast<int *>(field.data);
     return hash_range(ptr, ptr + field.dimension);
   }
+#endif
   default:
     throw std::runtime_error("Unknown type.");
   };
@@ -268,10 +270,12 @@ void common_bcast_parameter(int i) {
     MPI_Bcast((double *)fields.at(i).data, fields.at(i).dimension, MPI_DOUBLE,
               0, comm_cart);
     break;
+#ifdef LEES_EDWARDS
   case Datafield::Type::LEES_EDWARDS_MPI:
     MPI_Bcast((void *)fields.at(i).data, fields.at(i).dimension, lees_edwards_mpi_data,
               0, comm_cart);
     break;
+#endif 
   default:
     throw std::runtime_error("Unknown type.");
     break;
@@ -318,6 +322,7 @@ int mpi_bcast_parameter(int i) {
 
   return check_runtime_errors();
 }
-
+#ifdef LEES_EDWARDS
 MPI_Datatype lees_edwards_mpi_data;
+#endif
 

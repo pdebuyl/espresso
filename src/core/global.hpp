@@ -162,5 +162,4 @@ enum Fields {
 extern int warnings;
 
 extern MPI_Datatype lees_edwards_mpi_data;
-
 #endif
