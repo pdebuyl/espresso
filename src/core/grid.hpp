@@ -188,24 +188,23 @@ inline void get_mi_vector(T &res, U const &a, V const &b) {
   for (int i = 0; i < 3; i++)
     res[i] = a[i] - b[i];
 
-#ifdef LEES_EDWARDS
   auto const dy = res[1];
 
   for (int i = 0; i < 3; i++)
-    res[i] -= dround(res[i] * box_l_i[i]) * box_l[i];
-  
+    if (PERIODIC(i))
+      res[i] -= dround(res[i] * box_l_i[i]) * box_l[i];
+
+
+#ifdef LEES_EDWARDS
+
   if (std::abs(dy) > half_box_l[1]) {
-    //extern double sim_time;
-    //auto const shear_rate = 0.5;
-    //double const offset = sim_time * shear_rate;
-    //double const offset = 2.;
-    
+
     auto offset = lees_edwards_protocol.offset;
     auto shift =
         Utils::sgn(dy) * (offset - dround(offset * box_l_i[1]) * box_l[1]);
     res[0] -= shift;
   }
-#endif    
+#endif
 }
 
 template <typename T, typename U>
