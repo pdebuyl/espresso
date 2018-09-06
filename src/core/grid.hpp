@@ -48,6 +48,9 @@
 #include "communication.hpp"
 #include "errorhandling.hpp"
 #include "utils.hpp"
+#ifdef LEES_EDWARDS
+#include "lees_edwards.hpp"
+#endif
 
 #include <climits>
 
