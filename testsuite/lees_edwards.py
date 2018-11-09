@@ -16,7 +16,6 @@ class LeesEdwards(ut.TestCase):
     system.cell_system.set_n_square()
     system.set_random_state_PRNG()
 
-    tol = 1e-15
     time_step = 1.0
     system.time_step = time_step
 
@@ -70,7 +69,7 @@ class LeesEdwards(ut.TestCase):
         and velocity are updated correctly."""
 
         system = self.system
-        tol = self.tol
+        system.part.clear()
         system.time = 0.0
 
         # Set up a one particle system and check the position offset after crossing the boundary
@@ -92,8 +91,10 @@ class LeesEdwards(ut.TestCase):
                     vel[shearplanenormal] = 0.1
                     system.part.add(pos=pos, v=vel, id=0, type=0)
 
+                    print(system.part[0].v[0])
+
                     pos_change = np.zeros([3])
-                    pos_change[sheardir] = -0.5*system.time_step*velocity
+                    pos_change[sheardir] = -system.time_step*velocity
                     pos_change[shearplanenormal] = velocity*system.time_step
                     vel_change = np.zeros([3])
                     vel_change[sheardir] = -velocity
@@ -102,6 +103,11 @@ class LeesEdwards(ut.TestCase):
                     expected_vel = system.part[0].v + vel_change
 
                     system.integrator.run(1)
+
+                    print(system.time)
+                    print(system.lees_edwards.offset)
+                    print(system.lees_edwards.velocity)
+                    print(system.part[0].v[0])
 
                     np.testing.assert_almost_equal(
                         system.part[0].pos, expected_pos)
@@ -120,7 +126,7 @@ class LeesEdwards(ut.TestCase):
                     system.part.add(pos=pos, v=vel, id=0, type=0)
 
                     pos_change = np.zeros([3])
-                    pos_change[sheardir] = 0.5*system.time_step*velocity
+                    pos_change[sheardir] = system.time_step*velocity
                     pos_change[shearplanenormal] = -velocity*system.time_step
                     vel_change = np.zeros([3])
                     vel_change[sheardir] = velocity
@@ -143,6 +149,7 @@ class LeesEdwards(ut.TestCase):
            is included properly"""
 
         system = self.system
+        system.part.clear()
 
         dir = [0, 1, 2]
 
