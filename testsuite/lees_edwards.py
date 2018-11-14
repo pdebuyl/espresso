@@ -16,7 +16,7 @@ class LeesEdwards(ut.TestCase):
     system.cell_system.set_n_square()
     system.set_random_state_PRNG()
 
-    time_step = 1.0
+    time_step = 0.5
     system.time_step = time_step
 
     def test_a_Protocol(self):
@@ -86,12 +86,10 @@ class LeesEdwards(ut.TestCase):
                     system.lees_edwards.set_params(type = "steady_shear", velocity = velocity, sheardir = sheardir, shearplanenormal = shearplanenormal)
 
                     pos = np.full([3], 2.5)
-                    pos[shearplanenormal] = system.box_l[shearplanenormal] - 0.1
+                    pos[shearplanenormal] = system.box_l[shearplanenormal] - 0.05
                     vel = np.zeros([3])
                     vel[shearplanenormal] = 0.1
                     system.part.add(pos=pos, v=vel, id=0, type=0)
-
-                    print(system.part[0].v[0])
 
                     pos_change = np.zeros([3])
                     pos_change[sheardir] = -system.time_step*velocity
@@ -104,11 +102,6 @@ class LeesEdwards(ut.TestCase):
 
                     system.integrator.run(1)
 
-                    print(system.time)
-                    print(system.lees_edwards.offset)
-                    print(system.lees_edwards.velocity)
-                    print(system.part[0].v[0])
-
                     np.testing.assert_almost_equal(
                         system.part[0].pos, expected_pos)
                     np.testing.assert_almost_equal(
@@ -120,7 +113,7 @@ class LeesEdwards(ut.TestCase):
 
                     system.time = 0.0
                     pos = np.full([3], 2.5)
-                    pos[shearplanenormal] = 0.1
+                    pos[shearplanenormal] = 0.05
                     vel = np.zeros([3])
                     vel[shearplanenormal] = -0.1
                     system.part.add(pos=pos, v=vel, id=0, type=0)
