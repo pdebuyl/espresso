@@ -195,10 +195,6 @@ inline void get_mi_vector(T &res, U const &a, V const &b) {
   double const dy = res[lees_edwards_protocol.shearplanenormal];
 #endif
 
-  for (int i = 0; i < 3; i++)
-    if (std::fabs(res[i]) > half_box_l[i] && PERIODIC(i))
-      res[i] -= dround(res[i] * box_l_i[i]) * box_l[i];
-
 #ifdef LEES_EDWARDS
   if (std::abs(dy) > half_box_l[lees_edwards_protocol.shearplanenormal]) {
 
@@ -207,9 +203,14 @@ inline void get_mi_vector(T &res, U const &a, V const &b) {
         Utils::sgn(dy) *
         (offset - dround(offset * box_l_i[lees_edwards_protocol.sheardir]) *
                       box_l[lees_edwards_protocol.sheardir]);
-    res[lees_edwards_protocol.sheardir] -= shift;
-  }
+        res[lees_edwards_protocol.sheardir] -= shift;
+    }
 #endif
+
+  for (int i = 0; i < 3; i++)
+    if (std::fabs(res[i]) > half_box_l[i] && PERIODIC(i))
+      res[i] -= dround(res[i] * box_l_i[i]) * box_l[i];
+
 }
 
 template <typename T, typename U>
