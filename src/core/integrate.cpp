@@ -224,7 +224,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
   /* Prepare the Integrator */
   on_integration_start();
 #ifdef LEES_EDWARDS
-  setup_lees_edwards_protocol();
+  setup_lees_edwards_protocol(0.);
 #endif
 
 #ifdef IMMERSED_BOUNDARY
@@ -284,6 +284,11 @@ void integrate_vv(int n_steps, int reuse_forces) {
       ghost_communicator(&cell_structure.update_ghost_pos_comm);
     }
 #endif
+
+#ifdef LEES_EDWARDS
+  setup_lees_edwards_protocol(0.5*time_step);
+#endif
+
     force_calc();
 
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
@@ -525,7 +530,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 
 #ifdef LEES_EDWARDS
   // Necessary so that the Python interface is up-to-date
-  setup_lees_edwards_protocol();
+  setup_lees_edwards_protocol(0.);
 #endif
 }
 
