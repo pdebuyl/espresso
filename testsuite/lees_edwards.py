@@ -97,7 +97,7 @@ class LeesEdwards(ut.TestCase):
                     system.part.add(pos=pos, v=vel, id=0, type=0)
 
                     pos_change = np.zeros([3])
-                    pos_change[sheardir] = -system.time_step*velocity
+                    pos_change[sheardir] = -system.time_step*0.5*velocity
                     pos_change[shearplanenormal] = velocity*system.time_step
                     vel_change = np.zeros([3])
                     vel_change[sheardir] = -velocity
@@ -124,7 +124,7 @@ class LeesEdwards(ut.TestCase):
                     system.part.add(pos=pos, v=vel, id=0, type=0)
 
                     pos_change = np.zeros([3])
-                    pos_change[sheardir] = system.time_step*velocity
+                    pos_change[sheardir] = system.time_step*0.5*velocity
                     pos_change[shearplanenormal] = -velocity*system.time_step
                     vel_change = np.zeros([3])
                     vel_change[sheardir] = velocity
