@@ -1,152 +1,4 @@
 set(EspressoCore_SRC
-<<<<<<< HEAD
-    accumulators.cpp
-    cells.cpp
-    collision.cpp
-    comfixed_global.cpp
-    communication.cpp
-    constraints.cpp
-    cuda_init.cpp
-    cuda_interface.cpp
-    debug.cpp
-    domain_decomposition.cpp
-    dpd.cpp
-    energy.cpp
-    errorhandling.cpp
-    EspressoSystemInterface.cpp
-    fft-common.cpp
-    fft.cpp
-    fft-dipolar.cpp
-    forcecap.cpp
-    forces.cpp
-    galilei.cpp
-    ghmc.cpp
-    ghosts.cpp
-    global.cpp
-    grid.cpp
-    halo.cpp
-    immersed_boundaries.cpp
-    initialize.cpp
-    integrate.cpp
-    lattice.cpp
-    layered.cpp
-    lees_edwards.cpp
-    metadynamics.cpp
-    minimize_energy.cpp
-    MpiCallbacks.cpp
-    nemd.cpp
-    npt.cpp
-    nsquare.cpp
-    partCfg_global.cpp
-    particle_data.cpp
-    PdbParser.cpp
-    polymer.cpp
-    polynom.cpp
-    pressure.cpp
-    random.cpp
-    rattle.cpp
-    reaction_ensemble.cpp
-    rotate_system.cpp
-    rotation.cpp
-    RuntimeErrorCollector.cpp
-    RuntimeError.cpp
-    RuntimeErrorStream.cpp
-    specfunc.cpp
-    statistics_chain.cpp
-    statistics_cluster.cpp
-    statistics.cpp
-    statistics_fluid.cpp
-    swimmer_reaction.cpp
-    SystemInterface.cpp
-    thermostat.cpp
-    topology.cpp
-    tuning.cpp
-    virtual_sites.cpp
-)
-
-
-add_custom_command(
-  OUTPUT ${CMAKE_BINARY_DIR}/src/core/config-features.hpp ${CMAKE_BINARY_DIR}/src/core/config-features.cpp
-  COMMAND
-  ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/core/gen_featureconfig.py
-  ${CMAKE_SOURCE_DIR}/src/features.def
-  ${CMAKE_BINARY_DIR}/src/core/config-features.hpp
-  ${CMAKE_BINARY_DIR}/src/core/config-features.cpp
-  DEPENDS ${CMAKE_SOURCE_DIR}/src/features.def ${CMAKE_SOURCE_DIR}/src/core/gen_featureconfig.py
-||||||| merged common ancestors
-    accumulators.cpp
-    cells.cpp
-    collision.cpp
-    comfixed_global.cpp
-    communication.cpp
-    constraints.cpp
-    cuda_init.cpp
-    cuda_interface.cpp
-    debug.cpp
-    domain_decomposition.cpp
-    dpd.cpp
-    energy.cpp
-    errorhandling.cpp
-    EspressoSystemInterface.cpp
-    fft-common.cpp
-    fft.cpp
-    fft-dipolar.cpp
-    forcecap.cpp
-    forces.cpp
-    galilei.cpp
-    ghmc.cpp
-    ghosts.cpp
-    global.cpp
-    grid.cpp
-    halo.cpp
-    immersed_boundaries.cpp
-    initialize.cpp
-    integrate.cpp
-    lattice.cpp
-    layered.cpp
-    metadynamics.cpp
-    minimize_energy.cpp
-    MpiCallbacks.cpp
-    nemd.cpp
-    npt.cpp
-    nsquare.cpp
-    partCfg_global.cpp
-    particle_data.cpp
-    PdbParser.cpp
-    polymer.cpp
-    polynom.cpp
-    pressure.cpp
-    random.cpp
-    rattle.cpp
-    reaction_ensemble.cpp
-    rotate_system.cpp
-    rotation.cpp
-    RuntimeErrorCollector.cpp
-    RuntimeError.cpp
-    RuntimeErrorStream.cpp
-    specfunc.cpp
-    statistics_chain.cpp
-    statistics_cluster.cpp
-    statistics.cpp
-    statistics_fluid.cpp
-    swimmer_reaction.cpp
-    SystemInterface.cpp
-    thermostat.cpp
-    topology.cpp
-    tuning.cpp
-    virtual_sites.cpp
-)
-
-
-add_custom_command(
-  OUTPUT ${CMAKE_BINARY_DIR}/src/core/config-features.hpp ${CMAKE_BINARY_DIR}/src/core/config-features.cpp
-  COMMAND
-  ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/core/gen_featureconfig.py
-  ${CMAKE_SOURCE_DIR}/src/features.def
-  ${CMAKE_BINARY_DIR}/src/core/config-features.hpp
-  ${CMAKE_BINARY_DIR}/src/core/config-features.cpp
-  DEPENDS ${CMAKE_SOURCE_DIR}/src/features.def ${CMAKE_SOURCE_DIR}/src/core/gen_featureconfig.py
-=======
   accumulators.cpp
   cells.cpp
   collision.cpp
@@ -171,6 +23,7 @@ add_custom_command(
   integrate.cpp
   lattice.cpp
   layered.cpp
+  lees_edwards.cpp
   metadynamics.cpp
   minimize_energy.cpp
   MpiCallbacks.cpp
@@ -281,7 +134,6 @@ add_custom_command(
   virtual_sites/virtual_sites_com.cpp
   virtual_sites/VirtualSitesInertialessTracers.cpp
   virtual_sites/VirtualSitesRelative.cpp
->>>>>>> 2cd97e650ec47104f6dd4b1a3efbf7d6fa54e743
   )
 
 if(CUDA)
