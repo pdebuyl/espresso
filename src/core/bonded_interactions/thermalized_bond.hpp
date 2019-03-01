@@ -82,8 +82,8 @@ inline int calc_thermalized_bond_forces(const Particle *p1, const Particle *p2,
       force_lv_dist = -iaparams->p.thermalized_bond.pref1 * dist_vel;
     }
     // Add forces
-    force1[i] = - force_lv_dist;
-    force2[i] = + force_lv_dist;
+    force1[i] = -force_lv_dist;
+    force2[i] = +force_lv_dist;
   }
   return 0;
 }

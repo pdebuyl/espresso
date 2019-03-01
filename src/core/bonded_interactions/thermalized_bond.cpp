@@ -32,14 +32,15 @@
 
 int n_thermalized_bonds = 0;
 
-int thermalized_bond_set_params(int bond_type, double temp, double gamma, double r_cut) {
+int thermalized_bond_set_params(int bond_type, double temp, double gamma,
+                                double r_cut) {
   if (bond_type < 0)
     return ES_ERROR;
 
   make_bond_type_exist(bond_type);
 
   bonded_ia_params[bond_type].p.thermalized_bond.temp = temp;
-  bonded_ia_params[bond_type].p.thermalized_bond.gamma =gamma;
+  bonded_ia_params[bond_type].p.thermalized_bond.gamma = gamma;
   bonded_ia_params[bond_type].p.thermalized_bond.r_cut = r_cut;
   bonded_ia_params[bond_type].p.thermalized_bond.pref1 = gamma;
   bonded_ia_params[bond_type].p.thermalized_bond.pref2 =
@@ -65,11 +66,10 @@ void thermalized_bond_cool_down() {
 }
 
 void thermalized_bond_init() {
-
   for (auto &bonded_ia_param : bonded_ia_params) {
     if (bonded_ia_param.type == BONDED_IA_THERMALIZED_DIST) {
       Thermalized_bond_parameters &t = bonded_ia_param.p.thermalized_bond;
-      t.pref1_dist = t.gamma;
+      t.pref1 = t.gamma;
       t.pref2 =
           sqrt(24.0 * t.gamma / time_step * t.temp);
     }
