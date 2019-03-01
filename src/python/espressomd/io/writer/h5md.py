@@ -50,6 +50,8 @@ class H5md(object):
                  If masses should be written.
     write_charge : :obj:`bool`, opional
                    If charges should be written.
+    write_lees_edwards_offset : :obj:`bool`, optional
+                   If the position offset for Lees-Edwards should be written.
     write_ordered : :obj:`bool`, optional
                     If particle properties should be ordered according to
                     ids.
@@ -65,7 +67,8 @@ class H5md(object):
                      'write_force': 1 << 2,
                      'write_species': 1 << 3,
                      'write_mass': 1 << 4,
-                     'write_charge': 1 << 5}
+                     'write_charge': 1 << 5,
+                     'write_lees_edwards_offset': 1 << 6}
         self.valid_params.append(self.what.keys())
         self.what_bin = 0
         for i, j in iteritems(kwargs):
