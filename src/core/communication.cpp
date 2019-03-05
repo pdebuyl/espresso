@@ -197,7 +197,8 @@ static int terminated = 0;
   CB(mpi_resort_particles_slave)                                               \
   CB(mpi_get_pairs_slave)                                                      \
   CB(mpi_get_particles_slave)                                                  \
-  CB(mpi_rotate_system_slave)
+  CB(mpi_rotate_system_slave)                                                  \
+  CB(mpi_lees_edwards_image_reset_slave)                                       \
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -2302,6 +2303,18 @@ void mpi_galilei_transform_slave(int, int) {
   on_particle_change();
 }
 
+/****************** LEES_EDWARDS_IMAGE_RESET *******************/
+
+void mpi_lees_edwards_image_reset() {
+  mpi_call(mpi_lees_edwards_image_reset_slave, -1, 0);
+  local_lees_edwards_image_reset();
+  on_particle_change();
+}
+
+void mpi_lees_edwards_image_reset_slave(int, int) {
+  local_lees_edwards_image_reset();
+  on_particle_change();
+}
 /******************** REQ_SWIMMER_REACTIONS ********************/
 
 void mpi_setup_reaction() {

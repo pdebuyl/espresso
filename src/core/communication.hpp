@@ -605,6 +605,9 @@ void mpi_system_CMS_velocity();
 void mpi_galilei_transform();
 void mpi_observable_lb_radial_velocity_profile();
 
+/** Part of Lees Edwards image reset */
+void mpi_lees_edwards_image_reset();
+
 /** Issue REQ_SWIMMER_REACTIONS: notify the system of changes to the reaction
  *  parameters
  */
