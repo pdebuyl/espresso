@@ -2305,6 +2305,7 @@ void mpi_galilei_transform_slave(int, int) {
 
 /****************** LEES_EDWARDS_IMAGE_RESET *******************/
 
+#ifdef LEES_EDWARDS
 void mpi_lees_edwards_image_reset() {
   mpi_call(mpi_lees_edwards_image_reset_slave, -1, 0);
   local_lees_edwards_image_reset();
@@ -2315,6 +2316,8 @@ void mpi_lees_edwards_image_reset_slave(int, int) {
   local_lees_edwards_image_reset();
   on_particle_change();
 }
+#endif
+
 /******************** REQ_SWIMMER_REACTIONS ********************/
 
 void mpi_setup_reaction() {
