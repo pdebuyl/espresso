@@ -19,7 +19,7 @@
 include "myconfig.pxi"
 from libcpp cimport bool
 from interactions cimport ImmersedBoundaries
-from utils cimport Vector3i
+from utils cimport Vector3d, Vector3i
 
 cdef extern from "global.hpp":
     int FIELD_BOXL
@@ -116,7 +116,6 @@ cdef extern from "rattle.hpp":
 
 cdef extern from "tuning.hpp":
     extern int timing_samples
-
 
 cdef extern from "npt.hpp":
     ctypedef struct nptiso_struct:

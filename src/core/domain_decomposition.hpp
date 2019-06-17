@@ -69,7 +69,7 @@ struct DomainDecomposition {
   /** linked cell grid in nodes spatial domain. */
   int cell_grid[3];
   /** linked cell grid with ghost frame. */
-  int ghost_cell_grid[3];
+  Utils::Vector3i ghost_cell_grid;
   /** cell size.
    *  Def: \verbatim cell_grid[i] = (int)(local_box_l[i]/max_range);
    * \endverbatim

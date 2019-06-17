@@ -85,19 +85,13 @@ std::vector<std::pair<int, int>> get_pairs(double distance) {
 
   auto pair_kernel = [&ret, &cutoff2](Particle const &p1, Particle const &p2,
                                       double dist2) {
-    if (dist2 < cutoff2)
+    if (dist2 < cutoff2) {
       ret.emplace_back(p1.p.identity, p2.p.identity);
+    }
   };
 
   switch (cell_structure.type) {
   case CELL_STRUCTURE_DOMDEC:
-    Algorithm::link_cell(boost::make_indirect_iterator(local_cells.begin()),
-                         boost::make_indirect_iterator(local_cells.end()),
-                         Utils::NoOp{}, pair_kernel,
-                         [](Particle const &p1, Particle const &p2) {
-                           return (p1.r.p - p2.r.p).norm2();
-                         });
-    break;
   case CELL_STRUCTURE_NSQUARE:
     Algorithm::link_cell(boost::make_indirect_iterator(local_cells.begin()),
                          boost::make_indirect_iterator(local_cells.end()),
@@ -173,9 +167,8 @@ static void topology_release(int cs) {
     layered_topology_release();
     break;
   default:
-    fprintf(stderr,
-            "INTERNAL ERROR: attempting to sort the particles in an "
-            "unknown way (%d)\n",
+    fprintf(stderr, "INTERNAL ERROR: attempting to sort the particles in an "
+                    "unknown way (%d)\n",
             cs);
     errexit();
   }
@@ -202,9 +195,8 @@ void topology_init(int cs, CellPList *local) {
     layered_topology_init(local, node_grid);
     break;
   default:
-    fprintf(stderr,
-            "INTERNAL ERROR: attempting to sort the particles in an "
-            "unknown way (%d)\n",
+    fprintf(stderr, "INTERNAL ERROR: attempting to sort the particles in an "
+                    "unknown way (%d)\n",
             cs);
     errexit();
   }

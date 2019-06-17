@@ -71,7 +71,6 @@ void nsq_topology_init(CellPList *old) {
   cell_structure.type = CELL_STRUCTURE_NSQUARE;
   cell_structure.position_to_node = nsq_position_to_node;
   cell_structure.position_to_cell = nsq_position_to_cell;
-
   realloc_cells(n_nodes);
 
   /* mark cells */

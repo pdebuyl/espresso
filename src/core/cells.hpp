@@ -60,12 +60,11 @@
 #include <utility>
 #include <vector>
 
+#include "Cell.hpp"
 #include "ParticleIterator.hpp"
+#include "ParticleRange.hpp"
 #include "ghosts.hpp"
 #include "particle_data.hpp"
-
-#include "Cell.hpp"
-#include "ParticleRange.hpp"
 
 /** Cell Structure */
 enum {
