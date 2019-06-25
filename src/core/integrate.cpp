@@ -223,7 +223,8 @@ void integrate_vv(int n_steps, int reuse_forces) {
   /* Prepare the Integrator */
   on_integration_start();
 #ifdef LEES_EDWARDS
-  setup_lees_edwards_protocol(0.);
+  lees_edwards_protocol.offset =  lees_edwards_get_offset(sim_time);
+  lees_edwards_protocol.velocity =  lees_edwards_get_velocity(sim_time);
 #endif
 
 #ifdef IMMERSED_BOUNDARY
@@ -285,7 +286,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #endif
 
 #ifdef LEES_EDWARDS
-  setup_lees_edwards_protocol(0.5*time_step);
+  lees_edwards_protocol.velocity =  lees_edwards_get_velocity(sim_time + 0.5*time_step);
 #endif
 
     force_calc();
@@ -501,7 +502,8 @@ void integrate_vv(int n_steps, int reuse_forces) {
 
 #ifdef LEES_EDWARDS
   // Necessary so that the Python interface is up-to-date
-  setup_lees_edwards_protocol(0.);
+  lees_edwards_protocol.offset =  lees_edwards_get_offset(sim_time);
+  lees_edwards_protocol.velocity =  lees_edwards_get_velocity(sim_time);
 #endif
 }
 
