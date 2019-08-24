@@ -149,6 +149,7 @@ private:
 
 /** Calculation of current velocity*/
 inline bool get_verlet_list_support(std::shared_ptr<ActiveProtocol> protocol) {
+  return true;
   if (!protocol)
     return true;
   return boost::apply_visitor(VerletListSupportGetter(), *protocol);
@@ -208,5 +209,9 @@ struct Cache {
     shear_velocity = LeesEdwards::get_shear_velocity(vel_time, protocol);
   }
 };
+
+extern double pos_offset_at_verlet_rebuild;
+
+void on_verlet_rebuild();
 } // namespace LeesEdwards
 #endif

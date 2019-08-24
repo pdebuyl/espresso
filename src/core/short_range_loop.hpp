@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "algorithm/for_each_pair.hpp"
 #include "cells.hpp"
+#include "config.hpp"
 #include "grid.hpp"
+#include "lees_edwards.hpp"
 #include "nonbonded_interactions/nonbonded_interaction_data.hpp"
 
 #include <boost/iterator/indirect_iterator.hpp>
@@ -77,6 +79,9 @@ void short_range_loop(ParticleKernel &&particle_kernel,
         cell_structure.use_verlet_list, rebuild_verletlist);
 
     rebuild_verletlist = 0;
+#ifdef LEES_EDWARDS
+    LeesEdwards::on_verlet_rebuild();
+#endif    
   } else {
     for (auto &p : cell_structure.local_cells().particles()) {
       particle_kernel(p);

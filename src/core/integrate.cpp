@@ -173,6 +173,21 @@ void integrate_ensemble_init() {
 }
 
 /************************************************************/
+void verlet_list_update_check(const Particle& p) {
+#ifdef LEES_EDWARDS
+  Utils::Vector3d dx =p.r.p - p.l.p_old;
+  auto const shear_dir = LeesEdwards::get_shear_dir_coord(box_geo.lees_edwards_protocol);
+  auto const pos_offset = LeesEdwards::get_pos_offset(sim_time,box_geo.lees_edwards_protocol);
+  dx[shear_dir] = fabs(dx[shear_dir]) + fabs(pos_offset - LeesEdwards::pos_offset_at_verlet_rebuild);
+  if (dx.norm2() > skin2) { 
+    set_resort_particles(Cells::RESORT_LOCAL);
+  }
+#else
+  if ((p.r.p - p.l.p_old).norm2() > skin2)
+    set_resort_particles(Cells::RESORT_LOCAL);
+  }
+#endif
+}
 
 void integrate_vv(int n_steps, int reuse_forces) {
   ESPRESSO_PROFILER_CXX_MARK_FUNCTION;
@@ -656,10 +671,9 @@ void propagate_pos(const ParticleRange &particles) {
           p.r.p[j] += time_step * p.m.v[j];
         }
       }
-      /* Verlet criterion check */
-      if ((p.r.p - p.l.p_old).norm2() > skin2)
-        set_resort_particles(Cells::RESORT_LOCAL);
-    }
+
+      verlet_list_update_check(p);
+  }
   }
 }
 

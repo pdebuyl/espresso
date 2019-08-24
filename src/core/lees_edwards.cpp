@@ -21,6 +21,7 @@
 
 #include "lees_edwards.hpp"
 #include "integrate.hpp"
+#include "grid.hpp"
 #include <cmath>
 
 namespace LeesEdwards {
@@ -31,5 +32,12 @@ void local_image_reset(const ParticleRange &particles) {
     p.p.lees_edwards_offset = 0;
   }
 }
+
+double pos_offset_at_verlet_rebuild;
+
+void on_verlet_rebuild() {
+ pos_offset_at_verlet_rebuild = get_pos_offset(sim_time, box_geo.lees_edwards_protocol);
+}
+
 }
 #endif

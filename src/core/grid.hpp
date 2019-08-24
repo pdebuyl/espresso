@@ -96,11 +96,23 @@ void grid_changed_box_l(const BoxGeometry &box);
  * the particles accordingly */
 void rescale_boxl(int dir, double d_new);
 
-template <typename T> T get_mi_coord(T a, T b, T box_length, bool periodic) {
+template <typename T> T get_mi_coord(T a, T b, T box_length, T box_length_inv, bool periodic) {
   auto const dx = a - b;
 
   if (periodic && (std::fabs(dx) > (0.5 * box_length))) {
-    return dx - std::round(dx * (1. / box_length)) * box_length;
+//    return dx - int(dx * box_length_inv +.5) * box_length;
+    return dx - std::round(dx * box_length_inv) * box_length;
+  }
+
+  return dx;
+}
+
+template <typename T> T get_mi_coord(T a, T b, T box_length, T box_length_inv, bool periodic, double box_length_half) {
+  auto const dx = a - b;
+
+  if (periodic && (std::fabs(dx) > box_length_half)) {
+//    return dx - int(dx * box_length_inv +.5) * box_length;
+    return dx - std::round(dx * box_length_inv) * box_length;
   }
 
   return dx;
@@ -116,7 +128,6 @@ template <typename T, typename U, typename V>
 inline void get_mi_vector(T &res, U const &a, V const &b,
                           const BoxGeometry &box) {
 #ifdef LEES_EDWARDS
-  const double &offset = box.lees_edwards_state.pos_offset;
   const unsigned int shear_plane_normal =
       LeesEdwards::get_shear_plane_normal_coord(box.lees_edwards_protocol);
   const unsigned int shear_dir =
@@ -126,19 +137,17 @@ inline void get_mi_vector(T &res, U const &a, V const &b,
 #endif
   for (int i = 0; i < 3; i++) {
 #ifdef LEES_EDWARDS
-    double shift;
-    if (i == shear_dir &&
-        std::fabs(dist) > .5 * box.length()[shear_plane_normal]) {
-      shift =
-          Utils::sgn(dist) * (offset - round(offset / box.length()[shear_dir]) *
+    if (i == shear_dir)
+      if (std::fabs(dist) > box.length_half()[shear_plane_normal]) {
+  const double &offset = box.lees_edwards_state.pos_offset;
+      const double shift =
+          Utils::sgn(dist) * (offset - int(offset * box.length_inv()[shear_dir] +.5) *
                                            box.length()[shear_dir]);
-    } else {
-      shift = 0.0;
+      res[i] = get_mi_coord(a[i] - shift, b[i], box.length()[i], box.length_inv()[i], box.periodic(i));
+      continue;
     }
-#else
-    constexpr const double shift = 0.;
 #endif
-    res[i] = get_mi_coord(a[i] - shift, b[i], box.length()[i], box.periodic(i));
+    res[i] = get_mi_coord(a[i], b[i], box.length()[i], box.length_inv()[i], box.periodic(i),box.length_half()[i]);
   }
 }
 
