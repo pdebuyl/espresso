@@ -461,7 +461,7 @@ void dd_init_cell_interactions(const DomainDecomposition &dd,
         for (int i = 0; i < 3; i++) {
           if (dd.fully_connected[i]) {
             // Fully connected is only neede at the box surface
-            if (i==0 and (n!=start[1] or o!=end[1]) and (o!=start[2] or o!=end[2])) continue;
+            if (i==0 and (n!=start[1] or n!=end[1]) and (o!=start[2] or o!=end[2])) continue;
             if (i==1 and (m!=start[0] or m!=end[0]) and (o!=start[2] or o!=end[2])) continue;
             if (i==2 and (m!=start[0] or m!=end[0]) and (n!=start[1] or n!=end[1])) continue;
 
