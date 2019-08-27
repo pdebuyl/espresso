@@ -4,7 +4,7 @@
 #include "config.hpp"
 #include "core/grid.hpp"
 #include "core/lees_edwards.hpp"
-
+#include "cells.hpp"
 #ifdef LEES_EDWARDS
 
 namespace ScriptInterface {
@@ -21,6 +21,7 @@ public:
               box_geo.lees_edwards_protocol = m_protocol->protocol();
               box_geo.lees_edwards_state.update(box_geo.lees_edwards_protocol,
                                                 sim_time, sim_time);
+    set_resort_particles(Cells::RESORT_LOCAL);
             } else {
               throw std::runtime_error(
                   "A Lees Edwards protocol needs to be passed.");

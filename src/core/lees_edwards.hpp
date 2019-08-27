@@ -1,10 +1,11 @@
 #ifndef LEES_EDWARDS_H
 #define LEES_EDWARDS_H
 
+#include "config.hpp"
+#ifdef LEES_EDWARDS
 #include "ParticleRange.hpp"
 #include "algorithm/periodic_fold.hpp"
 #include "boost/variant.hpp"
-#include "config.hpp"
 #include "integrate.hpp"
 #include "particle_data.hpp"
 
@@ -200,13 +201,17 @@ void push(Particle &p, double pos_offset, double shear_velocity,
 /** Type for cacheing the current Lees-Edwards position offset and shear
  * velocity */
 struct Cache {
-  Cache() : pos_offset{0.}, shear_velocity{0.} {};
+  Cache() : pos_offset{0.}, shear_velocity{0.}, shear_dir{0},shear_plane_normal{0} {};
   double pos_offset;
   double shear_velocity;
+  unsigned int shear_plane_normal;
+  unsigned int shear_dir;
   void update(std::shared_ptr<ActiveProtocol> protocol, double pos_time,
               double vel_time) {
     pos_offset = LeesEdwards::get_pos_offset(pos_time, protocol);
     shear_velocity = LeesEdwards::get_shear_velocity(vel_time, protocol);
+    shear_dir = LeesEdwards::get_shear_dir_coord(protocol);
+    shear_plane_normal = LeesEdwards::get_shear_plane_normal_coord(protocol);
   }
 };
 
@@ -214,4 +219,5 @@ extern double pos_offset_at_verlet_rebuild;
 
 void on_verlet_rebuild();
 } // namespace LeesEdwards
+#endif
 #endif

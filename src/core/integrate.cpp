@@ -185,7 +185,6 @@ void verlet_list_update_check(const Particle& p) {
 #else
   if ((p.r.p - p.l.p_old).norm2() > skin2)
     set_resort_particles(Cells::RESORT_LOCAL);
-  }
 #endif
 }
 

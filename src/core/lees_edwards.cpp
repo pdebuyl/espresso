@@ -18,6 +18,8 @@
 */
 /** \file lees_edwards.cpp
  */
+#include "config.hpp"
+#ifdef LEES_EDWARDS
 
 #include "lees_edwards.hpp"
 #include "integrate.hpp"
@@ -25,7 +27,6 @@
 #include <cmath>
 
 namespace LeesEdwards {
-#ifdef LEES_EDWARDS
 void local_image_reset(const ParticleRange &particles) {
   for (auto &p : particles) {
     p.l.i = Utils::Vector3i::broadcast(0.);

@@ -148,7 +148,7 @@ print("Tune skin: {}".format(system.cell_system.tune_skin(
     min_skin=0.2, max_skin=1, tol=0.05, int_steps=100)))
 system.integrator.run(min(5 * measurement_steps, 60000))
 print("Tune skin: {}".format(system.cell_system.tune_skin(
-    min_skin=0.2, max_skin=1, tol=0.05, int_steps=100)))
+    min_skin=0.2, max_skin=1, tol=0.0125, int_steps=500)))
 system.integrator.run(min(10 * measurement_steps, 60000))
 
 print(system.non_bonded_inter[0, 0].lennard_jones)

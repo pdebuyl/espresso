@@ -15,6 +15,7 @@ class LeesEdwards(ut.TestCase):
     system = espressomd.System(box_l=[5.0, 5.0, 5.0])
     system.cell_system.skin = 0.0
     system.cell_system.set_n_square(use_verlet_lists=False)
+    system.set_random_state_PRNG()
 
     time_step = 0.5
     system.time_step = time_step
@@ -173,9 +174,10 @@ class LeesEdwards(ut.TestCase):
                     pos1[shear_plane_normal] = 4.75
                     pos2 = np.full([3], 2.5)
                     pos2[shear_plane_normal] = 0.25
+                    print((pos1-pos2)/system.box_l)
 
-                    system.part.add(id=0, pos=pos1,fix=(1,1,1))
-                    system.part.add(id=1, pos=pos2,fix=(1,1,1))
+                    p1=system.part.add(id=0, pos=pos1, fix=[1, 1, 1])
+                    p2=system.part.add(id=1, pos=pos2, fix=[1, 1, 1])
 
                     r = system.part[1].pos - system.part[0].pos
                     r[sheardir] += offset
@@ -189,8 +191,11 @@ class LeesEdwards(ut.TestCase):
                     system.non_bonded_inter[0, 0].soft_sphere.set_params(
                         a=k, n=-2, cutoff=r_cut)
 
-                    system.integrator.run(0, recalc_forces=True)
-                    print(system.analysis.stress_tensor())
+                    system.integrator.run(1, recalc_forces=True)
+                    np.testing.assert_allclose(
+                      system.distance_vec(p1,p2),r)
+                    np.testing.assert_allclose(
+                      system.distance_vec(p2,p1),-r)
 
                     simulated_bondedstress = np.abs(
                         system.analysis.stress_tensor()['bonded'])

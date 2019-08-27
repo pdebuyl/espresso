@@ -32,6 +32,7 @@
  */
 
 #include "BoxGeometry.hpp"
+#include "communication.hpp"
 #include "algorithm/periodic_fold.hpp"
 
 #include "LocalBox.hpp"
@@ -96,23 +97,11 @@ void grid_changed_box_l(const BoxGeometry &box);
  * the particles accordingly */
 void rescale_boxl(int dir, double d_new);
 
-template <typename T> T get_mi_coord(T a, T b, T box_length, T box_length_inv, bool periodic) {
+template <typename T> T get_mi_coord(T a, T b, T box_length, bool periodic) {
   auto const dx = a - b;
 
   if (periodic && (std::fabs(dx) > (0.5 * box_length))) {
-//    return dx - int(dx * box_length_inv +.5) * box_length;
-    return dx - std::round(dx * box_length_inv) * box_length;
-  }
-
-  return dx;
-}
-
-template <typename T> T get_mi_coord(T a, T b, T box_length, T box_length_inv, bool periodic, double box_length_half) {
-  auto const dx = a - b;
-
-  if (periodic && (std::fabs(dx) > box_length_half)) {
-//    return dx - int(dx * box_length_inv +.5) * box_length;
-    return dx - std::round(dx * box_length_inv) * box_length;
+    return dx - std::round(dx * (1. / box_length)) * box_length;
   }
 
   return dx;
@@ -127,28 +116,28 @@ template <typename T> T get_mi_coord(T a, T b, T box_length, T box_length_inv, b
 template <typename T, typename U, typename V>
 inline void get_mi_vector(T &res, U const &a, V const &b,
                           const BoxGeometry &box) {
-#ifdef LEES_EDWARDS
-  const unsigned int shear_plane_normal =
-      LeesEdwards::get_shear_plane_normal_coord(box.lees_edwards_protocol);
-  const unsigned int shear_dir =
-      LeesEdwards::get_shear_dir_coord(box.lees_edwards_protocol);
+res=a-b;
 
-  const double dist = a[shear_plane_normal] - b[shear_plane_normal];
-#endif
-  for (int i = 0; i < 3; i++) {
 #ifdef LEES_EDWARDS
-    if (i == shear_dir)
-      if (std::fabs(dist) > box.length_half()[shear_plane_normal]) {
   const double &offset = box.lees_edwards_state.pos_offset;
-      const double shift =
-          Utils::sgn(dist) * (offset - int(offset * box.length_inv()[shear_dir] +.5) *
-                                           box.length()[shear_dir]);
-      res[i] = get_mi_coord(a[i] - shift, b[i], box.length()[i], box.length_inv()[i], box.periodic(i));
-      continue;
+  if (offset!=0.) {
+  const unsigned int &shear_plane_normal = box.lees_edwards_state.shear_plane_normal;
+  if (std::fabs(res[shear_plane_normal]) > box.length_half()[shear_plane_normal]) {
+    const unsigned int &shear_dir = box.lees_edwards_state.shear_dir;
+      res[shear_dir] -=
+          Utils::sgn(res[shear_plane_normal]) * offset; 
     }
-#endif
-    res[i] = get_mi_coord(a[i], b[i], box.length()[i], box.length_inv()[i], box.periodic(i),box.length_half()[i]);
   }
+#endif
+
+// Apply minimum image convention
+for (int i=0;i<3;i++) {
+  if (box.periodic(i) && (std::fabs(res[i]) > box.length_half()[i])) {
+    res[i] -= std::round(res[i] * box.length_inv()[i]) * box.length()[i];
+  }
+}
+
+printf("%d: %g %g %g, %g %g %g -> %g %g %g\n",this_node,a[0],a[1],a[2],b[0],b[1],b[2],res[0],res[1],res[2]);
 }
 
 template <typename T, typename U>
