@@ -15,7 +15,6 @@ class LeesEdwards(ut.TestCase):
     system = espressomd.System(box_l=[5.0, 5.0, 5.0])
     system.cell_system.skin = 0.0
     system.cell_system.set_n_square(use_verlet_lists=False)
-    system.set_random_state_PRNG()
 
     time_step = 0.5
     system.time_step = time_step
@@ -175,8 +174,8 @@ class LeesEdwards(ut.TestCase):
                     pos2 = np.full([3], 2.5)
                     pos2[shear_plane_normal] = 0.25
 
-                    system.part.add(id=0, pos=pos1, fix=[1, 1, 1])
-                    system.part.add(id=1, pos=pos2, fix=[1, 1, 1])
+                    system.part.add(id=0, pos=pos1,fix=(1,1,1))
+                    system.part.add(id=1, pos=pos2,fix=(1,1,1))
 
                     r = system.part[1].pos - system.part[0].pos
                     r[sheardir] += offset
@@ -191,6 +190,7 @@ class LeesEdwards(ut.TestCase):
                         a=k, n=-2, cutoff=r_cut)
 
                     system.integrator.run(0, recalc_forces=True)
+                    print(system.analysis.stress_tensor())
 
                     simulated_bondedstress = np.abs(
                         system.analysis.stress_tensor()['bonded'])
@@ -247,21 +247,6 @@ class LeesEdwards(ut.TestCase):
            p2.v - p1.v)
 
         system.part.clear()
-
-    def test_e_VerletLists(self):
-        """ It is not possible to use Verlet lists with Lees Edwards in the current implementation
-        we are checking if the correct runtime error message is raised"""
-
-        system = self.system
-        system.cell_system.set_domain_decomposition(use_verlet_lists=True)
-        system.lees_edwards.protocol = \
-            lees_edwards.LinearShear(
-                shear_velocity=1.2,
-                shear_direction=2,
-                shear_plane_normal=0)
-
-        with self.assertRaises(Exception):
-            system.integrator.run(steps=10)
 
 if __name__ == "__main__":
     ut.main()
