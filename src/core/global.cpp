@@ -68,9 +68,6 @@ typedef struct {
 */
 
 const std::unordered_map<int, Datafield> fields{
-    {FIELD_BOXL,
-     {box_geo.m_length.data(), Datafield::Type::DOUBLE, 3,
-      "box_l"}}, /* 0  from grid.cpp */
     {FIELD_CELLGRID,
      {dd.cell_grid.data(), Datafield::Type::INT, 3,
       "cell_grid"}}, /* 1  from cells.cpp */
@@ -125,9 +122,6 @@ const std::unordered_map<int, Datafield> fields{
     {FIELD_NPTISO_PISTON,
      {&nptiso.piston, Datafield::Type::DOUBLE, 1,
       "npt_piston"}}, /* 27 from pressure.cpp */
-    {FIELD_PERIODIC,
-     {&box_geo.m_periodic, Datafield::Type::INT, 1,
-      "periodicity"}}, /* 28 from grid.cpp */
     {FIELD_SKIN,
      {&skin, Datafield::Type::DOUBLE, 1, "skin"}}, /* 29 from integrate.cpp */
     {FIELD_TEMPERATURE,

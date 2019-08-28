@@ -28,6 +28,7 @@
 #include "cells.hpp"
 #include "communication.hpp"
 #include "debug.hpp"
+#include "event.hpp"
 #include "global.hpp"
 
 #include <boost/algorithm/clamp.hpp>
@@ -120,6 +121,29 @@ void grid_changed_n_nodes() {
   grid_changed_box_l(box_geo);
 }
 
+
+void mpi_set_box_l_slave(Utils::Vector3d l) {
+box_geo.set_length(l);
+on_boxl_change();
+}
+REGISTER_CALLBACK(mpi_set_box_l_slave);
+
+void mpi_set_box_l(const Utils::Vector3d& l) {
+Communication::mpiCallbacks().call_all(mpi_set_box_l_slave, l);
+}
+
+void mpi_set_periodicity_slave(bool x, bool y, bool z) {
+box_geo.set_periodic(0,x);
+box_geo.set_periodic(1,y);
+box_geo.set_periodic(2,z);
+on_periodicity_change();
+}
+REGISTER_CALLBACK(mpi_set_periodicity_slave);
+
+void mpi_set_periodicity(bool x, bool y, bool z) {
+Communication::mpiCallbacks().call_all(mpi_set_periodicity_slave,x,y,z);
+}
+
 void rescale_boxl(int dir, double d_new) {
   double scale =
       (dir - 3) ? d_new / box_geo.length()[dir] : d_new / box_geo.length()[0];
@@ -137,7 +161,7 @@ void rescale_boxl(int dir, double d_new) {
     box_geo.set_length({d_new, d_new, d_new});
   }
 
-  mpi_bcast_parameter(FIELD_BOXL);
+  mpi_set_box_l(box_geo.length());
 
   if (scale > 1.) {
     mpi_rescale_particles(dir, scale);

@@ -112,6 +112,9 @@ void on_ghost_flags_change();
 /** called every time the walls for the lb fluid are changed */
 void on_lbboundary_change();
 
+/** Called when the box periodicity is changed */
+void on_periodicity_change();
+
 /*@}*/
 
 #endif

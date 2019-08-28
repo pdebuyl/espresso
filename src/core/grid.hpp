@@ -122,26 +122,23 @@ res=a-b;
   const double &offset = box.lees_edwards_state.pos_offset;
   if (offset!=0.) {
   const unsigned int &shear_plane_normal = box.lees_edwards_state.shear_plane_normal;
-  if (std::fabs(res[shear_plane_normal]) > box.length_half()[shear_plane_normal]) {
     const unsigned int &shear_dir = box.lees_edwards_state.shear_dir;
       res[shear_dir] -=
-          Utils::sgn(res[shear_plane_normal]) * offset; 
-    }
+          std::round(res[shear_plane_normal]*box.length_inv()[shear_plane_normal]) * offset; 
   }
 #endif
 
 // Apply minimum image convention
 for (int i=0;i<3;i++) {
-  if (box.periodic(i) && (std::fabs(res[i]) > box.length_half()[i])) {
+  if (box.periodic(i) and fabs(res[i]) > box.length_half()[i]) {
     res[i] -= std::round(res[i] * box.length_inv()[i]) * box.length()[i];
   }
 }
 
-printf("%d: %g %g %g, %g %g %g -> %g %g %g\n",this_node,a[0],a[1],a[2],b[0],b[1],b[2],res[0],res[1],res[2]);
 }
 
 template <typename T, typename U>
-Utils::Vector3d get_mi_vector(T const &a, U const &b, const BoxGeometry &box) {
+inline Utils::Vector3d get_mi_vector(T const &a, U const &b, const BoxGeometry &box) {
   Utils::Vector3d res;
   get_mi_vector(res, a, b, box);
 
@@ -256,5 +253,9 @@ public:
 LocalBox<double> regular_decomposition(const BoxGeometry &box,
                                        Utils::Vector3i const &node_pos,
                                        Utils::Vector3i const &node_grid);
+
+void mpi_set_periodicity(bool,bool,bool);
+
+void mpi_set_box_l(const Utils::Vector3d&);
 /*@}*/
 #endif

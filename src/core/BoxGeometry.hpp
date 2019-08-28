@@ -13,13 +13,14 @@
 #endif
 
 class BoxGeometry {
-public:
+private:
   /** Flags for all three dimensions whether pbc are applied (default). */
-  std::bitset<3> m_periodic = 0b111;
+  std::bitset<3> m_periodic;
   /** Side lengths of the box */
-  Utils::Vector3d m_length = {1, 1, 1};
-  Utils::Vector3d m_length_half = {.5,.5,.5};
-  Utils::Vector3d m_length_inv = {1, 1, 1};
+  Utils::Vector3d m_length;
+  Utils::Vector3d m_length_half;
+  Utils::Vector3d m_length_inv;
+public:
 
   /**
    * @brief Set periodicity for direction
@@ -58,6 +59,18 @@ public:
     m_length_inv = {1./box_l[0],1./box_l[1],1./box_l[2]};
 
   }
+  BoxGeometry() {
+    set_length({1,1,1});
+    m_periodic = 0b111;
+  }
+  BoxGeometry(const BoxGeometry &rhs) {
+    m_periodic=rhs.m_periodic;
+    set_length(rhs.length());
+#ifdef LEES_EDWARDS    
+    lees_edwards_state = rhs.lees_edwards_state;
+    lees_edwards_protocol = rhs.lees_edwards_protocol;
+#endif
+  };
 
 #ifdef LEES_EDWARDS
   LeesEdwards::Cache lees_edwards_state;

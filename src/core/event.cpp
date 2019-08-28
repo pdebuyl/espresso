@@ -364,31 +364,12 @@ void on_parameter_change(int field) {
       fprintf(stderr, "%d: shon_parameter_change %d\n", this_node, field));
 
   switch (field) {
-  case FIELD_BOXL:
-    on_boxl_change();
-    break;
   case FIELD_MIN_GLOBAL_CUT:
     recalc_maximal_cutoff();
     cells_on_geometry_change(0);
     break;
   case FIELD_SKIN:
     cells_on_geometry_change(0);
-    break;
-  case FIELD_PERIODIC:
-#ifdef SCAFACOS
-#ifdef ELECTROSTATICS
-    if (coulomb.method == COULOMB_SCAFACOS) {
-      Scafacos::update_system_params();
-    }
-#endif
-#ifdef DIPOLES
-    if (dipole.method == DIPOLAR_SCAFACOS) {
-      Scafacos::update_system_params();
-    }
-#endif
-
-#endif
-    cells_on_geometry_change(CELL_FLAG_GRIDCHANGED);
     break;
   case FIELD_NODEGRID:
     grid_changed_n_nodes();
@@ -482,4 +463,21 @@ void on_ghost_flags_change() {
     ghosts_have_bonds = 1;
   }
 #endif
+}
+
+void on_periodicity_change() {
+#ifdef SCAFACOS
+#ifdef ELECTROSTATICS
+    if (coulomb.method == COULOMB_SCAFACOS) {
+      Scafacos::update_system_params();
+    }
+#endif
+#ifdef DIPOLES
+    if (dipole.method == DIPOLAR_SCAFACOS) {
+      Scafacos::update_system_params();
+    }
+#endif
+
+#endif
+    cells_on_geometry_change(CELL_FLAG_GRIDCHANGED);
 }

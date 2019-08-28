@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from libcpp cimport bool
+from libcpp cimport bool as cppbool
 include "myconfig.pxi"
 
 from globals cimport *
@@ -76,7 +76,7 @@ if VIRTUAL_SITES:
 if OIF_GLOBAL_FORCES:
     setable_properties.append("max_oif_objects")
 
-cdef bool _system_created = False
+cdef cppbool _system_created = False
 
 cdef class System:
     """ The base class for espressomd.system.System().
@@ -229,7 +229,6 @@ cdef class System:
         """
 
         def __set__(self, _periodic):
-            global periodic
             if len(_periodic) != 3:
                 raise ValueError(
                     "periodicity must be of length 3, got length " + str(len(_periodic)))

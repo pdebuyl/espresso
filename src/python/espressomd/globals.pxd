@@ -19,17 +19,15 @@
 include "myconfig.pxi"
 from libcpp cimport bool
 from interactions cimport ImmersedBoundaries
-from utils cimport Vector3i
+from utils cimport Vector3i, Vector3d
 
 cdef extern from "global.hpp":
-    int FIELD_BOXL
     int FIELD_SKIN
     int FIELD_NODEGRID
     int FIELD_MAXNUMCELLS
     int FIELD_MINNUMCELLS
     int FIELD_NPTISO_PISTON
     int FIELD_NPTISO_PDIFF
-    int FIELD_PERIODIC
     int FIELD_SIMTIME
     int FIELD_MIN_GLOBAL_CUT
     int FIELD_THERMO_SWITCH
@@ -156,3 +154,8 @@ cdef extern from "lees_edwards.hpp":
         int shearplanenormal
 
     cdef extern lees_edwards_protocol_struct lees_edwards_protocol
+
+cdef extern from "grid.hpp":
+    void mpi_set_box_l(Vector3d l)
+    void mpi_set_periodicity(bool x, bool y, bool z)
+

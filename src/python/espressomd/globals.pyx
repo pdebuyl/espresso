@@ -11,6 +11,9 @@ from globals cimport forcecap_get
 from espressomd.utils import array_locked, is_valid_type
 from espressomd.utils cimport Vector3d, make_array_locked
 
+from .utils cimport Vector3d
+from libcpp cimport bool
+
 cdef class Globals:
     property box_l:
         def __set__(self, _box_l):
@@ -22,8 +25,7 @@ cdef class Globals:
                     raise ValueError(
                         "Box length must be > 0  in all directions")
                 temp_box_l[i] = _box_l[i]
-            grid.box_geo.set_length(temp_box_l)
-            mpi_bcast_parameter(FIELD_BOXL)
+            mpi_set_box_l(temp_box_l)
 
         def __get__(self):
             return make_array_locked( < Vector3d > grid.box_geo.length())
@@ -48,10 +50,7 @@ cdef class Globals:
 
     property periodicity:
         def __set__(self, _periodic):
-            for i in range(3):
-                grid.box_geo.set_periodic(i, _periodic[i])
-
-            mpi_bcast_parameter(FIELD_PERIODIC)
+            mpi_set_periodicity(_periodic[0],_periodic[1],_periodic[2]);
 
         def __get__(self):
             periodicity = np.zeros(3)

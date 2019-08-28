@@ -603,7 +603,9 @@ void propagate_press_box_pos_and_rescale_npt(const ParticleRange &particles) {
       box_geo.set_length(new_box);
     }
 
-    MPI_Bcast(box_geo.m_length.data(), 3, MPI_DOUBLE, 0, comm_cart);
+    auto tmp=box_geo.length();
+    MPI_Bcast(tmp.data(), 3, MPI_DOUBLE, 0, comm_cart);
+    box_geo.set_length(tmp);
 
     /* fast box length update */
     grid_changed_box_l(box_geo);

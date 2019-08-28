@@ -43,11 +43,14 @@ struct Distance {
 };
 
 namespace detail {
-struct MinimalImageDistance {
-  const BoxGeometry box;
+class MinimalImageDistance {
+  const BoxGeometry& m_box;
+  public:
+    MinimalImageDistance(const BoxGeometry& box) : m_box{box} {};
 
+  inline
   Distance operator()(Particle const &p1, Particle const &p2) const {
-    return Distance(get_mi_vector(p1.r.p, p2.r.p, box));
+    return Distance(get_mi_vector(p1.r.p, p2.r.p, m_box));
   }
 };
 

@@ -204,8 +204,8 @@ struct Cache {
   Cache() : pos_offset{0.}, shear_velocity{0.}, shear_dir{0},shear_plane_normal{0} {};
   double pos_offset;
   double shear_velocity;
-  unsigned int shear_plane_normal;
   unsigned int shear_dir;
+  unsigned int shear_plane_normal;
   void update(std::shared_ptr<ActiveProtocol> protocol, double pos_time,
               double vel_time) {
     pos_offset = LeesEdwards::get_pos_offset(pos_time, protocol);
