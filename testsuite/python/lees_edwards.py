@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import espressomd
 from espressomd.interactions import HarmonicBond
 import espressomd.lees_edwards as lees_edwards
@@ -329,8 +327,6 @@ class LeesEdwards(ut.TestCase):
         p3 = system.part.add(pos=(2.5, 4.5, 2.5), type = 11, v = (2.0, 1. , 1.25))
 
         system.integrator.run(0, recalc_forces=True)
-        print("vel diff:", p2.v-p3.v)
-        print("force:", p3.f)
 
         f_p1 = np.copy(p1.f)
         f_p2 = np.copy(p2.f)
@@ -346,8 +342,6 @@ class LeesEdwards(ut.TestCase):
         p3 = system.part.add(pos=(2.5, 5.75, 2.5), type = 11, v = (0.0, 1. , 1.25))
 
         system.integrator.run(0, recalc_forces=True)
-        print("vel diff:", p2.v-p3.v)
-        print("force:", p3.f)
 
         np.testing.assert_array_almost_equal(np.copy(p1.f), f_p1)
         np.testing.assert_array_almost_equal(np.copy(p2.f), f_p2)
@@ -363,8 +357,6 @@ class LeesEdwards(ut.TestCase):
         p3 = system.part.add(pos=(2.5, 6.5, 2.5), type = 11, v = (0., 1. , 1.25))
 
         system.integrator.run(0, recalc_forces=True)
-        print("vel diff:", p2.v-p3.v)
-        print("force:", p3.f)
 
         np.testing.assert_array_almost_equal(np.copy(p1.f), f_p1)
         np.testing.assert_array_almost_equal(np.copy(p2.f), f_p2)
