@@ -226,9 +226,10 @@ inline Utils::Vector3d vel_diff(Utils::Vector3d const &x,
       LeesEdwards::get_shear_plane_normal_coord(box.lees_edwards_protocol);
   auto const shear_dir =
       LeesEdwards::get_shear_dir_coord(box.lees_edwards_protocol);
-  auto const dy = std::abs(x[shear_plane_normal] - y[shear_plane_normal]);
-  if (dy > 0.5 * box.length()[shear_plane_normal]) {
-    ret[shear_dir] += Utils::sgn(dy) * shear_velocity;
+  auto const dy = x[shear_plane_normal] - y[shear_plane_normal];
+  //printf("dy: %f", dy);
+  if (fabs(dy) > 0.5 * box.length()[shear_plane_normal]) {
+    ret[shear_dir] -= Utils::sgn(dy) * shear_velocity;
   }
 #endif
 

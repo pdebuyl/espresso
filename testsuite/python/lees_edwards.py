@@ -3,6 +3,7 @@ from __future__ import print_function
 import espressomd
 from espressomd.interactions import HarmonicBond
 import espressomd.lees_edwards as lees_edwards
+from espressomd.virtual_sites import VirtualSitesRelative, VirtualSitesOff
 
 import unittest as ut
 import numpy as np
@@ -14,7 +15,7 @@ class LeesEdwards(ut.TestCase):
 
     system = espressomd.System(box_l=[5.0, 5.0, 5.0])
     system.cell_system.skin = 0.0
-    system.cell_system.set_n_square(use_verlet_lists=False)
+    system.cell_system.set_n_square(use_verlet_lists=True)
     system.set_random_state_PRNG()
 
     time_step = 0.5
@@ -34,7 +35,8 @@ class LeesEdwards(ut.TestCase):
             'shear_velocity': 1.2,
             'shear_direction': 2,
             'shear_plane_normal': 0,
-            'initial_pos_offset': 0.1}
+            'initial_pos_offset': 0.1,
+            'time_0': 0.0}
         new_protocol = lees_edwards.LinearShear(**params)
         system.lees_edwards.protocol = new_protocol 
         self.assertEqual(self.system.lees_edwards.protocol, new_protocol)
@@ -154,6 +156,7 @@ class LeesEdwards(ut.TestCase):
            is included properly"""
 
         system = self.system
+        system.time = 0.0
         system.part.clear()
 
         dir = [0, 1, 2]
@@ -174,7 +177,6 @@ class LeesEdwards(ut.TestCase):
                     pos1[shear_plane_normal] = 4.75
                     pos2 = np.full([3], 2.5)
                     pos2[shear_plane_normal] = 0.25
-                    print((pos1-pos2)/system.box_l)
 
                     p1=system.part.add(id=0, pos=pos1, fix=[1, 1, 1])
                     p2=system.part.add(id=1, pos=pos2, fix=[1, 1, 1])
@@ -223,6 +225,8 @@ class LeesEdwards(ut.TestCase):
                     system.part.clear()
 
     def test_d_vel_diff(self):
+        """We place particles within a box and across a box boundary to check if
+           the Lees Edwards shift is taken into account correctly."""
 
         system = self.system
         system.part.clear()
@@ -237,7 +241,7 @@ class LeesEdwards(ut.TestCase):
         p2 = system.part.add(
             id=1, pos=[1, 1, 0.1 * system.box_l[2]], v=[7, 6.1, -1])
 
-        vel_diff = system.velocity_difference(p1, p2)
+        vel_diff = np.copy(system.velocity_difference(p1, p2))
         np.testing.assert_array_equal(
             vel_diff, p2.v - p1.v + np.array([system.lees_edwards.shear_velocity, 0, 0]))
 
@@ -246,12 +250,125 @@ class LeesEdwards(ut.TestCase):
 
         p1 = system.part.add(id=0, pos=[1, 1, 0.5], v=[0.4, 0.4, 0.4])
         p2 = system.part.add(id=1, pos=[1, 1, 1.0], v=[0.1, 0.1, 0.1])
-        vel_diff = system.velocity_difference(p1, p2)
+        vel_diff = np.copy(system.velocity_difference(p1, p2))
         np.testing.assert_array_equal(
-            vel_diff,
-           p2.v - p1.v)
+            vel_diff, p2.v - p1.v)
 
         system.part.clear()
+
+    def test_e_virt_sites_rotation(self):
+        """A particle with virtual sites is plces on the boudary. We check if
+           the forces yield the correct torque and if a rotation frequency is
+           transmitted backl to the virtual sites."""
+
+
+        system = self.system
+        system.part.clear()
+        system.min_global_cut = 2.5
+        self.system.virtual_sites = VirtualSitesRelative(have_velocity=True)
+
+        system.lees_edwards.protocol = \
+            lees_edwards.LinearShear(
+                shear_velocity=0.0,
+                shear_direction=0,
+                shear_plane_normal=1,
+                initial_pos_offset= 2.0
+                )
+
+        p1 = system.part.add(
+            id=0, pos=[2.5, 5.0, 2.5], rotation=(1,1,1))
+
+        p2 = system.part.add(pos=(2.5, 6.0, 2.5), ext_force=( 1.0, 0., 0.), fix=(1,1,1))
+        p2.vs_auto_relate_to(0)
+        p3 = system.part.add(pos=(2.5, 4.0, 2.5), ext_force=(-1.0, 0., 0.), fix=(1,1,1))
+        p3.vs_auto_relate_to(0)
+
+        system.integrator.run(0, recalc_forces=True)
+
+        np.testing.assert_array_almost_equal(
+            np.copy(p1.torque_lab), [0.0, 0.0, -2.0])
+
+        p1.omega_lab = (0., 0., 2.5)
+        system.integrator.run(0, recalc_forces=True)
+
+        np.testing.assert_array_almost_equal(
+            np.copy(p2.v), [-2.5, 0.0, 0.0])
+        np.testing.assert_array_almost_equal(
+            np.copy(p3.v), [2.5, -5.0, 0.0])
+
+    def test_f_virt_sites_interaction(self):
+        """A virtual site interacts with a real particle via a DPD interaction to get
+           a velocity dependent force. First we measure a force within the primary
+           simulation box as reference. Then we compare it first with the situation of
+           the interaction across the Lees Edwards boundary and second with the vector
+           from the real particle to the virtual site crossing the boundary."""
+
+        system = self.system
+        system.time = 0.0
+        system.part.clear()
+        self.system.virtual_sites = VirtualSitesRelative(have_velocity=True)
+
+        system.thermostat.set_dpd(kT=0.0, seed=1)
+        system.non_bonded_inter[11, 11].dpd.set_params(
+            weight_function=0, gamma=1.75, r_cut=2.,
+            trans_weight_function=0, trans_gamma=1.5, trans_r_cut=2.0)
+
+        system.lees_edwards.protocol = \
+            lees_edwards.LinearShear(
+                shear_velocity=2.0,
+                shear_direction=0,
+                shear_plane_normal=1,
+                initial_pos_offset= 0.0
+                )
+
+        p1 = system.part.add(
+            id=0, pos=[2.5, 2.5, 2.5], rotation=(1,1,1), type = 10, v = (0.0, -0.1, -0.25))
+        p2 = system.part.add(pos=(2.5, 3.5, 2.5), type =11)
+        p2.vs_auto_relate_to(0)
+
+        p3 = system.part.add(pos=(2.5, 4.5, 2.5), type = 11, v = (2.0, 1. , 1.25))
+
+        system.integrator.run(0, recalc_forces=True)
+        print("vel diff:", p2.v-p3.v)
+        print("force:", p3.f)
+
+        f_p1 = np.copy(p1.f)
+        f_p2 = np.copy(p2.f)
+        f_p3 = np.copy(p3.f)
+
+        system.part.clear()
+
+        p1 = system.part.add(
+            id=0, pos=[2.5, 3.75, 2.5], rotation=(1,1,1), type = 10, v = (0.0, -0.1, -0.25))
+        p2 = system.part.add(pos=(2.5, 4.75, 2.5), type = 11)
+        p2.vs_auto_relate_to(0)
+
+        p3 = system.part.add(pos=(2.5, 5.75, 2.5), type = 11, v = (0.0, 1. , 1.25))
+
+        system.integrator.run(0, recalc_forces=True)
+        print("vel diff:", p2.v-p3.v)
+        print("force:", p3.f)
+
+        np.testing.assert_array_almost_equal(np.copy(p1.f), f_p1)
+        np.testing.assert_array_almost_equal(np.copy(p2.f), f_p2)
+        np.testing.assert_array_almost_equal(np.copy(p3.f), f_p3)
+
+        system.part.clear()
+
+        p1 = system.part.add(
+            id=0, pos=[2.5, 4.5, 2.5], rotation=(1,1,1), type = 10, v = (0.0, -0.1, -0.25))
+        p2 = system.part.add(pos=(2.5, 5.5, 2.5), type = 11)
+        p2.vs_auto_relate_to(0)
+
+        p3 = system.part.add(pos=(2.5, 6.5, 2.5), type = 11, v = (0., 1. , 1.25))
+
+        system.integrator.run(0, recalc_forces=True)
+        print("vel diff:", p2.v-p3.v)
+        print("force:", p3.f)
+
+        np.testing.assert_array_almost_equal(np.copy(p1.f), f_p1)
+        np.testing.assert_array_almost_equal(np.copy(p2.f), f_p2)
+        np.testing.assert_array_almost_equal(np.copy(p3.f), f_p3)
 
 if __name__ == "__main__":
     ut.main()
