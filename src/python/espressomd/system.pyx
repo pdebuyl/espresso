@@ -23,7 +23,8 @@ from globals cimport *
 import numpy as np
 import collections
 
-from grid cimport get_mi_vector, box_geo, vel_diff
+from grid cimport get_mi_vector, box_geo
+from . cimport grid
 from . cimport integrate
 from . import interactions
 from . import integrate
@@ -438,7 +439,7 @@ cdef class System:
 
         """
 
-        cdef Vector3d res = vel_diff(make_Vector3d(p2.pos), make_Vector3d(p1.pos), make_Vector3d(p2.v), make_Vector3d(p1.v), box_geo)
+        cdef Vector3d res = grid.velocity_difference(make_Vector3d(p2.pos), make_Vector3d(p1.pos), make_Vector3d(p2.v), make_Vector3d(p1.v), <const grid.BoxGeometry> box_geo)
         return make_array_locked(res)
 
     def rotate_system(self, **kwargs):

@@ -123,7 +123,7 @@ void VirtualSitesRelative::update_vel(Particle &p) const {
   // Obtain velocity from v=v_real particle + omega_real_particle \times
   // director
   p.m.v = p_real->m.v;
-  p.m.v -= vel_diff(p.r.p, p_real->r.p, p.m.v, p_real->m.v, box_geo);
+  p.m.v -= velocity_difference(p.r.p, p_real->r.p, p.m.v, p_real->m.v, box_geo);
   p.m.v += vector_product(omega_space_frame, d);
 }
 
