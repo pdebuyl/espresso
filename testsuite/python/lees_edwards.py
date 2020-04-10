@@ -294,8 +294,6 @@ class LeesEdwards(ut.TestCase):
             system.integrator.run(20)
         
         system.integrator.set_vv()
-        system.cell_system.set_n_square(use_verlet_lists=False)
-        
         params = {
             'shear_velocity': 0.1,
             'shear_direction': 2,
