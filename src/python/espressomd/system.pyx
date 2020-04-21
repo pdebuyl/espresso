@@ -431,7 +431,7 @@ cdef class System:
 
         """
 
-        cdef Vector3d mi_vec = get_mi_vector(make_Vector3d(p2.pos_folded), make_Vector3d(p1.pos_folded), <const grid.BoxGeometry> box_geo)
+        cdef Vector3d mi_vec = get_mi_vector(make_Vector3d(p2.pos_folded), make_Vector3d(p1.pos_folded), box_geo)
         return make_array_locked(mi_vec)
 
     def velocity_difference(self, p1, p2):
