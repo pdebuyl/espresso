@@ -484,14 +484,20 @@ class LeesEdwards(ut.TestCase):
             system.integrator.run(1,recalc_forces=True)
             verify_lj_forces(system, 1E-10)
  
-#        n_nodes = self.system.cell_system.get_state()['n_nodes']
-#        system.cell_system.node_grid = [1, 1, n_nodes]
-#        system.cell_system.set_domain_decomposition(
-#            fully_connected=[True, False, False])
-#
-#        system.integrator.run(0,recalc_forces=True)
-#        verify_lj_forces(system, 1E-10)
-#
+        n_nodes = self.system.cell_system.get_state()['n_nodes']
+        if n_nodes == 2:
+            system.cell_system.node_grid = [1, 1, 2]
+            system.cell_system.set_domain_decomposition(
+                fully_connected=[True, False, False])
+        
+        if n_nodes == 4:
+            system.cell_system.node_grid = [1, 2, 2]
+            system.cell_system.set_domain_decomposition(
+                fully_connected=[True, False, False])
+
+        system.integrator.run(0,recalc_forces=True)
+        verify_lj_forces(system, 1E-10)
+
         system.part.clear()
 
         # Turn off lj interaction
@@ -547,14 +553,20 @@ class LeesEdwards(ut.TestCase):
             system.integrator.run(1,recalc_forces=True)
             verify_lj_forces(system, 1E-10)
 
-#        n_nodes = self.system.cell_system.get_state()['n_nodes']
-#        system.cell_system.node_grid = [1, 1, n_nodes]
-#        system.cell_system.set_domain_decomposition(
-#            fully_connected=[True, False, False])
-#
-#        system.integrator.run(0,recalc_forces=True)
-#        verify_lj_forces(system, 1E-10)
-#
+        n_nodes = self.system.cell_system.get_state()['n_nodes']
+        if n_nodes == 2:
+            system.cell_system.node_grid = [1, 1, 2]
+            system.cell_system.set_domain_decomposition(
+                fully_connected=[True, False, False])
+        
+        if n_nodes == 4:
+            system.cell_system.node_grid = [1, 2, 2]
+            system.cell_system.set_domain_decomposition(
+                fully_connected=[True, False, False])
+
+        system.integrator.run(0,recalc_forces=True)
+        verify_lj_forces(system, 1E-10)
+
         system.part.clear()
 
         # Turn off lj interaction
@@ -568,12 +580,8 @@ class LeesEdwards(ut.TestCase):
 
         system = self.system
         system.cell_system.set_n_square(use_verlet_lists=False)
-        #n_nodes = self.system.cell_system.get_state()['n_nodes']
-        #system.cell_system.node_grid = [1, 1, n_nodes]
-        #system.cell_system.set_domain_decomposition(
-        #    fully_connected=[True, False, False])
         # Parameters
-        n = 50 
+        n = 200 
         phi = 0.55
         sigma = 1.
         eps = 1
@@ -605,6 +613,12 @@ class LeesEdwards(ut.TestCase):
             system.integrator.run(100)
 
         system.integrator.set_vv()
+        system.part[:].v=np.random.random((n,3))
+        for i in range(1000):
+            e_kin=0.5*np.sum(system.part[:].v**2)
+            system.part[:].v = system.part[:].v /np.sqrt(e_kin)
+            system.integrator.run(10)
+        
         system.time = 0
         f1 = system.part[:].f
         p1 = system.part[:].pos
@@ -622,6 +636,21 @@ class LeesEdwards(ut.TestCase):
  
         system.integrator.run(0,recalc_forces=True)
         verify_lj_forces(system, 1E-10)
+        
+        n_nodes = self.system.cell_system.get_state()['n_nodes']
+        if n_nodes == 2:
+            system.cell_system.node_grid = [1, 1, 2]
+            system.cell_system.set_domain_decomposition(
+                fully_connected=[True, False, False])
+        
+        if n_nodes == 4:
+            system.cell_system.node_grid = [1, 2, 2]
+            system.cell_system.set_domain_decomposition(
+                fully_connected=[True, False, False])
+        
+        system.integrator.run(0,recalc_forces=True)
+        verify_lj_forces(system, 1E-10)
+        
         system.part.clear()
 
         # Turn off lj interaction
@@ -638,7 +667,7 @@ class LeesEdwards(ut.TestCase):
         system.part.clear()
         system.cell_system.set_n_square(use_verlet_lists=False)
         # Parameters
-        n = 50 
+        n = 200 
         phi = 0.55
         sigma = 1.
         eps = 1
@@ -666,7 +695,7 @@ class LeesEdwards(ut.TestCase):
         # Remove overlap
         system.integrator.set_steepest_descent(
             f_max=0, gamma=0.1, max_displacement=0.05)
-        while system.analysis.energy()["total"] > 10 * n:
+        while system.analysis.energy()["total"] > 5 * n:
             system.integrator.run(20)
  
         system.integrator.set_vv()
@@ -682,7 +711,6 @@ class LeesEdwards(ut.TestCase):
         system.part[:].v=np.random.random((n,3))
         # Integrate
         for i in range(1000):
-            print(i)
             e_kin=0.5*np.sum(system.part[:].v**2)
             system.part[:].v = system.part[:].v /np.sqrt(e_kin)
             system.integrator.run(10)
@@ -722,6 +750,22 @@ class LeesEdwards(ut.TestCase):
         # Verify lj forces on the particles.
         verify_lj_forces(system, 1E-10)
         print(system.analysis.energy()["non_bonded"])
+        
+        n_nodes = self.system.cell_system.get_state()['n_nodes']
+        if n_nodes == 2:
+            system.cell_system.node_grid = [1, 1, 2]
+            system.cell_system.set_domain_decomposition(
+                fully_connected=[True, False, False])
+        
+        if n_nodes == 4:
+            system.cell_system.node_grid = [1, 2, 2]
+            system.cell_system.set_domain_decomposition(
+                fully_connected=[True, False, False])
+        
+        system.integrator.run(0,recalc_forces=True)
+        verify_lj_forces(system, 1E-10)
+
+        system.part.clear()
 
         # Turn off lj interaction
         system.non_bonded_inter[0, 0].lennard_jones.set_params(
