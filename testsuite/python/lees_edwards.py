@@ -579,6 +579,7 @@ class LeesEdwards(ut.TestCase):
            or are outdated in the short range loop. """
 
         system = self.system
+        system.cell_system.min_num_cells = 2
         system.cell_system.set_n_square(use_verlet_lists=False)
         # Parameters
         n = 200 
@@ -610,7 +611,7 @@ class LeesEdwards(ut.TestCase):
         system.integrator.set_steepest_descent(
             f_max=0, gamma=0.1, max_displacement=0.05)
         while system.analysis.energy()["total"] > 5 * n:
-            system.integrator.run(100)
+            system.integrator.run(20)
 
         system.integrator.set_vv()
         system.part[:].v=np.random.random((n,3))
@@ -665,6 +666,7 @@ class LeesEdwards(ut.TestCase):
 
         system = self.system
         system.part.clear()
+        system.cell_system.min_num_cells = 2
         system.cell_system.set_n_square(use_verlet_lists=False)
         # Parameters
         n = 200 
