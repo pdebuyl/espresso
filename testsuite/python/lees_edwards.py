@@ -34,8 +34,7 @@ class LeesEdwards(ut.TestCase):
             'shear_velocity': 1.2,
             'shear_direction': 2,
             'shear_plane_normal': 0,
-            'initial_pos_offset': 0.1,
-            'time_0': 0.0}
+            'initial_pos_offset': 0.1}
         new_protocol = lees_edwards.LinearShear(**params)
         system.lees_edwards.protocol = new_protocol 
         self.assertEqual(self.system.lees_edwards.protocol, new_protocol)
@@ -222,6 +221,10 @@ class LeesEdwards(ut.TestCase):
                         simulated_nonbondedstress, analytical_nonbondedstress)
 
                     system.part.clear()
+                    
+                    # Turn off soft sphere interaction
+                    system.non_bonded_inter[0, 0].soft_sphere.set_params(
+                        a=0, n=0, cutoff=0)
 
     def test_d_vel_diff(self):
         """We place particles within a box and across a box boundary to check if
@@ -362,72 +365,20 @@ class LeesEdwards(ut.TestCase):
         np.testing.assert_array_almost_equal(np.copy(p1.f), f_p1)
         np.testing.assert_array_almost_equal(np.copy(p2.f), f_p2)
         np.testing.assert_array_almost_equal(np.copy(p3.f), f_p3)
-
-
-    def test_z1_lj_constant_offset(self):
-        """Simulates a static LJ liquid with a constant offset  and verifies forces.
-           This is to make sure that the get_mi_works corrctly and now pairs get lost 
-           or are outdated in the short range loop. """
-
-        system = self.system
-        system.cell_system.set_n_square(use_verlet_lists=False)
-        # Parameters
-        n = 50 
-        phi = 0.55
-        sigma = 1.
-        eps = 1
-        cut = sigma * 2**(1./6.)
-
-        # box
-        l = (n / 6. * np.pi * sigma**3 / phi)**(1. / 3.)
-
-        # Setup
-        system.box_l = l, l, l
+        
         system.part.clear()
 
-        system.time_step = 0.01
-        system.thermostat.turn_off()
+        system.non_bonded_inter[11, 11].dpd.set_params(
+            weight_function=0, gamma=0, r_cut=0,
+            trans_weight_function=0, trans_gamma=0, trans_r_cut=0)
 
-        system.lees_edwards.protocol = lees_edwards.Off() 
-        system.lees_edwards.pos_offset = 0
-        system.lees_edwards.shear_velocity = 0
-
-        system.part.add(pos=np.random.random((n,3)) * l)
-
-        # interactions
-        system.non_bonded_inter[0, 0].lennard_jones.set_params(
-            epsilon=eps, sigma=sigma, cutoff=cut, shift="auto")
-        # Remove overlap
-        system.integrator.set_steepest_descent(
-            f_max=0, gamma=0.1, max_displacement=0.05)
-        while system.analysis.energy()["total"] > 10 * n:
-            system.integrator.run(20)
-
-        system.integrator.set_vv()
-        system.time = 0
-        f1 = system.part[:].f
-        p1 = system.part[:].pos
-        verify_lj_forces(system, 1E-10)
-
-        # Switch to constant offset protocol
-        new_params.update(shear_velocity=0,
-            initial_pos_offset=np.sqrt(2))
-        print('LE protocol', system.lees_edwards.shear_velocity)
-        print('LE protocol', system.lees_edwards.pos_offset)
- 
-        system.integrator.run(0,recalc_forces=True)
-        verify_lj_forces(system, 1E-10)
-        system.part.clear()
-
-        # Turn off lj interaction
-        system.non_bonded_inter[0, 0].lennard_jones.set_params(
-            epsilon=0, sigma=0, cutoff=0, shift=0)
-
-    def test_z2_lj_interaction(self):
+    def test_z1_lj_interaction(self):
         """Takes two LJ particles across a boundary and checks with verify LJ forces
            if the interactin is right. Done in the columnar cell system and in n_square"""
 
         system = self.system
+        system.part.clear()
+        system.time = 0.0
         system.cell_system.set_n_square(use_verlet_lists=False)
         # Parameters
         sigma = 1.
@@ -443,44 +394,176 @@ class LeesEdwards(ut.TestCase):
         system.thermostat.turn_off()
 
         system.lees_edwards.protocol = lees_edwards.Off() 
-        system.lees_edwards.pos_offset = 0
-        system.lees_edwards.shear_velocity = 0
 
-        system.part.add(pos=np.random.random((n,3)) * l)
+        system.part.add(pos=[2.5, 4.5, 2.5])
+        system.part.add(pos=[2.5, 5.5, 2.5])
 
         # interactions
         system.non_bonded_inter[0, 0].lennard_jones.set_params(
             epsilon=eps, sigma=sigma, cutoff=cut, shift="auto")
-        # Remove overlap
-        system.integrator.set_steepest_descent(
-            f_max=0, gamma=0.1, max_displacement=0.05)
-        while system.analysis.energy()["total"] > 10 * n:
-            system.integrator.run(20)
 
-        system.integrator.set_vv()
-        system.time = 0
-        f1 = system.part[:].f
-        p1 = system.part[:].pos
+        system.integrator.run(0,recalc_forces=True)
         verify_lj_forces(system, 1E-10)
 
         # Switch to constant offset protocol
-        new_params.update(shear_velocity=0,
-            initial_pos_offset=np.sqrt(2))
+        params = {
+            'shear_velocity': 0.0,
+            'shear_direction': 0,
+            'shear_plane_normal': 1,
+            'initial_pos_offset': np.sqrt(0.1)}
+
+        system.lees_edwards.protocol = lees_edwards.LinearShear(**params)
+
         print('LE protocol', system.lees_edwards.shear_velocity)
         print('LE protocol', system.lees_edwards.pos_offset)
  
         system.integrator.run(0,recalc_forces=True)
         verify_lj_forces(system, 1E-10)
+
+        n_nodes = self.system.cell_system.get_state()['n_nodes']
+        system.cell_system.node_grid = [1, 1, n_nodes]
+        system.cell_system.set_domain_decomposition(
+            fully_connected=[True, False, False])
+
+        system.integrator.run(0,recalc_forces=True)
+        verify_lj_forces(system, 1E-10)
+
         system.part.clear()
- 
+
         # Turn off lj interaction
         system.non_bonded_inter[0, 0].lennard_jones.set_params(
             epsilon=0, sigma=0, cutoff=0, shift=0)
 
-#    def test_z_lj(self):
-#        """Simulates an LJ liquid under linear shear and verifies forces. This is to make sure that no pairs
-#           get lost or are outdated in the short range loop.
-#           To have deterministic forces, velocity capping is used rather than a thermostat."""
+    def test_z2_moving_lj_particle(self):
+        """Takes two LJ particles across a boundary and checks with verify LJ forces
+           if the interactin is right. Done in the columnar cell system and in n_square.
+           This time the particles are moving."""
+
+        system = self.system
+        system.time = 0.0
+        system.part.clear()
+        system.cell_system.set_n_square(use_verlet_lists=False)
+        # Parameters
+        sigma = 1.
+        eps = 1
+        cut = sigma * 2**(1./6.)
+
+        # box
+        l = 5.0
+
+        # Setup
+        system.box_l = l, l, l
+        system.time_step = 0.01
+        system.thermostat.turn_off()
+
+        system.lees_edwards.protocol = lees_edwards.Off() 
+
+        system.part.add(pos=[2.5, 4.5, 2.5])
+        system.part.add(pos=[1.5, 5.5, 2.5])
+
+        # interactions
+        system.non_bonded_inter[0, 0].lennard_jones.set_params(
+            epsilon=eps, sigma=sigma, cutoff=cut, shift="auto")
+
+        system.integrator.run(0,recalc_forces=True)
+        verify_lj_forces(system, 1E-10)
+
+        # Switch to constant offset protocol
+        params = {
+            'shear_velocity': 0.1,
+            'shear_direction': 0,
+            'shear_plane_normal': 1,
+            'initial_pos_offset': 0.0}
+        system.lees_edwards.protocol = lees_edwards.LinearShear(**params)
+
+        print('LE protocol', system.lees_edwards.shear_velocity)
+        print('LE protocol', system.lees_edwards.pos_offset)
+
+        for i in range(20):
+            system.integrator.run(1,recalc_forces=True)
+            verify_lj_forces(system, 1E-10)
+ 
+#        n_nodes = self.system.cell_system.get_state()['n_nodes']
+#        system.cell_system.node_grid = [1, 1, n_nodes]
+#        system.cell_system.set_domain_decomposition(
+#            fully_connected=[True, False, False])
+#
+#        system.integrator.run(0,recalc_forces=True)
+#        verify_lj_forces(system, 1E-10)
+#
+        system.part.clear()
+
+        # Turn off lj interaction
+        system.non_bonded_inter[0, 0].lennard_jones.set_params(
+            epsilon=0, sigma=0, cutoff=0, shift=0)
+
+    def test_z3_moving_lj_particle_with_partner(self):
+        """Same as before but this time with three interaction partners. One of them
+           gets an artificial velocity with the same value as the shearing velocity."""
+
+        system = self.system
+        system.time = 0.0
+        system.part.clear()
+        system.cell_system.set_n_square(use_verlet_lists=False)
+        # Parameters
+        sigma = 1.
+        eps = 1
+        cut = sigma * 2**(1./6.)
+
+        # box
+        l = 5.0
+
+        # Setup
+        system.box_l = l, l, l
+        system.time_step = 0.01
+        system.thermostat.turn_off()
+
+        system.lees_edwards.protocol = lees_edwards.Off() 
+
+        system.part.add(pos=[2.5, 4.5, 2.5])
+        system.part.add(pos=[1.5, 5.5, 2.5])
+        system.part.add(pos=[1.5, 6.5, 2.5], v = [0.1,0,0])
+
+        # interactions
+        system.non_bonded_inter[0, 0].lennard_jones.set_params(
+            epsilon=eps, sigma=sigma, cutoff=cut, shift="auto")
+
+        system.integrator.run(0,recalc_forces=True)
+        verify_lj_forces(system, 1E-10)
+
+        # Switch to constant offset protocol
+        params = {
+            'shear_velocity': 0.1,
+            'shear_direction': 0,
+            'shear_plane_normal': 1,
+            'initial_pos_offset': 0.0}
+        system.lees_edwards.protocol = lees_edwards.LinearShear(**params)
+
+        print('LE protocol', system.lees_edwards.shear_velocity)
+        print('LE protocol', system.lees_edwards.pos_offset)
+
+        for i in range(20):
+            system.integrator.run(1,recalc_forces=True)
+            verify_lj_forces(system, 1E-10)
+
+#        n_nodes = self.system.cell_system.get_state()['n_nodes']
+#        system.cell_system.node_grid = [1, 1, n_nodes]
+#        system.cell_system.set_domain_decomposition(
+#            fully_connected=[True, False, False])
+#
+#        system.integrator.run(0,recalc_forces=True)
+#        verify_lj_forces(system, 1E-10)
+#
+        system.part.clear()
+
+        # Turn off lj interaction
+        system.non_bonded_inter[0, 0].lennard_jones.set_params(
+            epsilon=0, sigma=0, cutoff=0, shift=0)
+
+#    def test_z4_lj_fluid_constant_offset(self):
+#        """Simulates a static LJ liquid with a constant offset  and verifies forces.
+#           This is to make sure that the get_mi_works corrctly and now pairs get lost 
+#           or are outdated in the short range loop. """
 #
 #        system = self.system
 #        system.cell_system.set_n_square(use_verlet_lists=False)
@@ -506,7 +589,7 @@ class LeesEdwards(ut.TestCase):
 #        system.lees_edwards.shear_velocity = 0
 #
 #        system.part.add(pos=np.random.random((n,3)) * l)
-#        
+#
 #        # interactions
 #        system.non_bonded_inter[0, 0].lennard_jones.set_params(
 #            epsilon=eps, sigma=sigma, cutoff=cut, shift="auto")
@@ -515,7 +598,68 @@ class LeesEdwards(ut.TestCase):
 #            f_max=0, gamma=0.1, max_displacement=0.05)
 #        while system.analysis.energy()["total"] > 10 * n:
 #            system.integrator.run(20)
-#        
+#
+#        system.integrator.set_vv()
+#        system.time = 0
+#        f1 = system.part[:].f
+#        p1 = system.part[:].pos
+#        verify_lj_forces(system, 1E-10)
+#
+#        # Switch to constant offset protocol
+#        new_params.update(shear_velocity=0,
+#            initial_pos_offset=np.sqrt(2))
+#        print('LE protocol', system.lees_edwards.shear_velocity)
+#        print('LE protocol', system.lees_edwards.pos_offset)
+# 
+#        system.integrator.run(0,recalc_forces=True)
+#        verify_lj_forces(system, 1E-10)
+#        system.part.clear()
+#
+#        # Turn off lj interaction
+#        system.non_bonded_inter[0, 0].lennard_jones.set_params(
+#            epsilon=0, sigma=0, cutoff=0, shift=0)
+#
+#
+#    def test_z5_lj(self):
+#        """Simulates an LJ liquid under linear shear and verifies forces. This is to make sure that no pairs
+#           get lost or are outdated in the short range loop.
+#           To have deterministic forces, velocity capping is used rather than a thermostat."""
+#
+#        system = self.system
+#        system.part.clear()
+#        system.cell_system.set_n_square(use_verlet_lists=False)
+#        # Parameters
+#        n = 50 
+#        phi = 0.55
+#        sigma = 1.
+#        eps = 1
+#        cut = sigma * 2**(1./6.)
+#
+#        # box
+#        l = (n / 6. * np.pi * sigma**3 / phi)**(1. / 3.)
+#
+#        # Setup
+#        system.box_l = l, l, l
+#        system.part.clear()
+#
+#        system.time_step = 0.01
+#        system.thermostat.turn_off()
+#
+#        system.lees_edwards.protocol = lees_edwards.Off() 
+#        system.lees_edwards.pos_offset = 0
+#        system.lees_edwards.shear_velocity = 0
+#
+#        system.part.add(pos=np.random.random((n,3)) * l)
+# 
+#        # interactions
+#        system.non_bonded_inter[0, 0].lennard_jones.set_params(
+#            epsilon=eps, sigma=sigma, cutoff=cut, shift="auto")
+#        # Remove overlap
+#        system.integrator.set_steepest_descent(
+#            f_max=0, gamma=0.1, max_displacement=0.05)
+#        while system.analysis.energy()["total"] > 10 * n:
+#            system.integrator.run(20)
+# 
 #        system.integrator.set_vv()
 #        system.time = 0
 #        params = {
