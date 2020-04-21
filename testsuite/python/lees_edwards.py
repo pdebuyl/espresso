@@ -34,7 +34,8 @@ class LeesEdwards(ut.TestCase):
             'shear_velocity': 1.2,
             'shear_direction': 2,
             'shear_plane_normal': 0,
-            'initial_pos_offset': 0.1}
+            'initial_pos_offset': 0.1,
+            'time_0': 0.0}
         new_protocol = lees_edwards.LinearShear(**params)
         system.lees_edwards.protocol = new_protocol 
         self.assertEqual(self.system.lees_edwards.protocol, new_protocol)
