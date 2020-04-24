@@ -31,7 +31,9 @@ struct Off {
 struct LinearShear {
   LinearShear()
       : m_initial_pos_offset{0.}, m_shear_velocity{0.}, m_time_0{0.},
-        m_shear_plane_normal_coord{0}, m_shear_dir_coord{0} {};
+        m_shear_plane_normal_coord{0}, m_shear_dir_coord{0} {
+	  m_time_0 = sim_time;
+	};
   double shear_velocity(double time) const { return m_shear_velocity; };
   double pos_offset(double time) const {
     return m_initial_pos_offset + (time - m_time_0) * m_shear_velocity;
