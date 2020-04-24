@@ -48,7 +48,9 @@ struct LinearShear {
 struct OscillatoryShear {
   OscillatoryShear()
       : m_amplitude{0.}, m_frequency{0.}, m_time_0{0.},
-        m_shear_plane_normal_coord{0}, m_shear_dir_coord{0} {};
+        m_shear_plane_normal_coord{0}, m_shear_dir_coord{0} {
+	  m_time_0 = sim_time;
+	};
   double pos_offset(double time) const {
     return m_amplitude * std::sin(m_frequency * (time - m_time_0));
   }
