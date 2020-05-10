@@ -22,7 +22,9 @@ public:
           boost::get<::LeesEdwards::LinearShear>(*m_protocol)
               .m_initial_pos_offset},
          {"shear_velocity", boost::get<::LeesEdwards::LinearShear>(*m_protocol)
-                                .m_shear_velocity}});
+                                .m_shear_velocity},
+         {"time_0",
+          boost::get<::LeesEdwards::LinearShear>(*m_protocol).m_time_0}});
   }
   std::shared_ptr<::LeesEdwards::ActiveProtocol> protocol() override {
     return m_protocol;

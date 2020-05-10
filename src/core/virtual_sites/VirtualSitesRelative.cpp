@@ -122,7 +122,9 @@ void VirtualSitesRelative::update_vel(Particle &p) const {
       convert_vector_body_to_space(*p_real, p_real->m.omega);
   // Obtain velocity from v=v_real particle + omega_real_particle \times
   // director
-  p.m.v = vector_product(omega_space_frame, d) + p_real->m.v;
+  p.m.v = p_real->m.v;
+  p.m.v -= velocity_difference(p.r.p, p_real->r.p, p.m.v, p_real->m.v, box_geo);
+  p.m.v += vector_product(omega_space_frame, d);
 }
 
 // Distribute forces that have accumulated on virtual particles to the

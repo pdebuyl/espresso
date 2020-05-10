@@ -113,14 +113,14 @@ void dpd_cool_down() {
   dpd_update_params(pref_scale);
 }
 
-int dpd_set_params(int part_type_a, int part_type_b, double gamma, double r_c,
-                   int wf, double tgamma, double tr_c, int twf) {
-  IA_parameters *data = get_ia_param_safe(part_type_a, part_type_b);
+int dpd_set_params(int part_type_a, int part_type_b, double gamma, double k,
+                   double r_c, int wf, double tgamma, double tr_c, int twf) {
+  IA_parameters &ia_params = *get_ia_param_safe(part_type_a, part_type_b);
 
-  data->dpd_radial = DPDParameters{
-      gamma, r_c, wf, sqrt(24.0 * temperature * gamma / time_step)};
-  data->dpd_trans = DPDParameters{
-      tgamma, tr_c, twf, sqrt(24.0 * temperature * tgamma / time_step)};
+  ia_params.dpd_radial = DPDParameters{
+      gamma, k, r_c, wf, sqrt(24.0 * temperature * gamma / time_step)};
+  ia_params.dpd_trans = DPDParameters{
+      tgamma, k, tr_c, twf, sqrt(24.0 * temperature * tgamma / time_step)};
 
   /* broadcast interaction parameters */
   mpi_bcast_ia_params(part_type_a, part_type_b);
@@ -152,17 +152,17 @@ void dpd_update_params(double pref_scale) {
   }
 }
 
-static double weight(int type, double r_cut, double r) {
+static double weight(int type, double r_cut, double k, double r) {
   if (type == 0) {
     return 1.;
   }
-  return 1. - r / r_cut;
+  return 1. - pow((r / r_cut), k);
 }
 
 Vector3d dpd_pair_force(DPDParameters const &params, Vector3d const &v,
                         double dist, Vector3d const &noise) {
   if (dist < params.cutoff) {
-    auto const omega = weight(params.wf, params.cutoff, dist);
+    auto const omega = weight(params.wf, params.cutoff, params.k, dist);
     auto const omega2 = Utils::sqr(omega);
 
     auto const f_d = params.gamma * omega2 * v;
@@ -184,7 +184,7 @@ Utils::Vector3d dpd_pair_force(Particle const *const p1,
     return {};
   }
 
-  auto const v21 = vel_diff(p1->r.p, p2->r.p, p1->m.v, p2->m.v, box_geo);
+  auto const v21 = velocity_difference(p1->r.p, p2->r.p, p1->m.v, p2->m.v, box_geo);
   auto const noise_vec =
       (ia_params->dpd_radial.pref > 0.0 || ia_params->dpd_trans.pref > 0.0)
           ? dpd_noise(p1->p.identity, p2->p.identity)
@@ -208,7 +208,7 @@ static auto dpd_viscous_stress_local() {
   short_range_loop(
       Utils::NoOp{},
       [&stress](const Particle &p1, const Particle &p2, Distance const &d) {
-        auto const v21 = vel_diff(p1.r.p, p2.r.p, p1.m.v, p2.m.v, box_geo);
+        auto const v21 = velocity_difference(p1.r.p, p2.r.p, p1.m.v, p2.m.v, box_geo);
 
         auto ia_params = get_ia_param(p1.p.type, p2.p.type);
         auto const dist = std::sqrt(d.dist2);

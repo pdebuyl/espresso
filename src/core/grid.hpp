@@ -212,11 +212,11 @@ inline Utils::Vector3d unfolded_position(const Utils::Vector3d &pos,
 }
 
 /** Calculate the velocity difference including the Lees Edwards velocity*/
-inline Utils::Vector3d vel_diff(Utils::Vector3d const &x,
-                                Utils::Vector3d const &y,
-                                Utils::Vector3d const &u,
-                                Utils::Vector3d const &v,
-                                const BoxGeometry &box) {
+inline Utils::Vector3d velocity_difference(Utils::Vector3d const &x,
+                                           Utils::Vector3d const &y,
+                                           Utils::Vector3d const &u,
+                                           Utils::Vector3d const &v,
+                                           const BoxGeometry &box) {
 
   auto ret = u - v;
 
@@ -226,9 +226,9 @@ inline Utils::Vector3d vel_diff(Utils::Vector3d const &x,
       LeesEdwards::get_shear_plane_normal_coord(box.lees_edwards_protocol);
   auto const shear_dir =
       LeesEdwards::get_shear_dir_coord(box.lees_edwards_protocol);
-  auto const dy = std::abs(x[shear_plane_normal] - y[shear_plane_normal]);
-  if (dy > 0.5 * box.length()[shear_plane_normal]) {
-    ret[shear_dir] += Utils::sgn(dy) * shear_velocity;
+  auto const dy = x[shear_plane_normal] - y[shear_plane_normal];
+  if (fabs(dy) > 0.5 * box.length()[shear_plane_normal]) {
+    ret[shear_dir] -= Utils::sgn(dy) * shear_velocity;
   }
 #endif
 
