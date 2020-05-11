@@ -562,11 +562,7 @@ class LeesEdwards(ut.TestCase):
         system.non_bonded_inter[0, 0].lennard_jones.set_params(
             epsilon=0, sigma=0, cutoff=0, shift=0)
 
-    def test_z4_lj_fluid_constant_offset(self):
-        """Simulates a static LJ liquid with a constant offset  and verifies forces.
-           This is to make sure that the get_mi_works corrctly and now pairs get lost 
-           or are outdated in the short range loop. """
-
+    def setup_lj_liquid(self):
         system = self.system
         system.cell_system.set_n_square(use_verlet_lists=False)
         # Parameters
@@ -597,24 +593,28 @@ class LeesEdwards(ut.TestCase):
             epsilon=eps, sigma=sigma, cutoff=cut, shift="auto")
         # Remove overlap
         system.integrator.set_steepest_descent(
-            f_max=0, gamma=0.01, max_displacement=0.05)
+            f_max=0, gamma=0.05, max_displacement=0.05)
         while system.analysis.energy()["total"] > 8 * n:
             system.integrator.run(20)
             print(system.analysis.energy()["total"])
 
         system.integrator.set_vv()
         system.part[:].v=np.random.random((n,3))
-        for i in range(20):
+        for i in range(5):
             e_kin=0.5*np.sum(system.part[:].v**2)
-            print(e_kin)
             system.part[:].v = system.part[:].v /np.sqrt(e_kin)
             system.integrator.run(40)
         verify_lj_forces(system, 1E-10)
-        
-        f1 = system.part[:].f
-        p1 = system.part[:].pos
-        print("passed initial verification")
+    
+    def test_z4_lj_fluid_constant_offset(self):
+        """Simulates a static LJ liquid with a constant offset  and verifies forces.
+           This is to make sure that the get_mi_works corrctly and now pairs get lost 
+           or are outdated in the short range loop. """
 
+        system = self.system
+        self.setup_lj_liquid()
+
+        
         # Switch to constant offset protocol
         system.lees_edwards.protocol = lees_edwards.LinearShear(**
             {
@@ -650,43 +650,8 @@ class LeesEdwards(ut.TestCase):
         """Simulates an LJ liquid under linear shear and verifies forces. This is to make sure that no pairs
            get lost or are outdated in the short range loop.
            To have deterministic forces, velocity capping is used rather than a thermostat."""
-
-        system = self.system
-        system.part.clear()
-        system.cell_system.set_n_square(use_verlet_lists=False)
-        # Parameters
-        n = 200 
-        phi = 0.55
-        sigma = 1.
-        eps = 1
-        cut = sigma * 2**(1./6.)
-
-        # box
-        l = (n / 6. * np.pi * sigma**3 / phi)**(1. / 3.)
-
-        # Setup
-        system.box_l = l, l, l
-        system.part.clear()
-
-        system.time_step = 0.01
-        system.thermostat.turn_off()
-
-        system.lees_edwards.protocol = lees_edwards.Off() 
-        system.lees_edwards.pos_offset = 0
-        system.lees_edwards.shear_velocity = 0
-
-        system.part.add(pos=np.random.random((n,3)) * l)
- 
-        # interactions
-        system.non_bonded_inter[0, 0].lennard_jones.set_params(
-            epsilon=eps, sigma=sigma, cutoff=cut, shift="auto")
-        # Remove overlap
-        system.integrator.set_steepest_descent(
-            f_max=0, gamma=0.1, max_displacement=0.05)
-        while system.analysis.energy()["total"] > 5 * n:
-            system.integrator.run(20)
- 
-        system.integrator.set_vv()
+        system=self.system
+        self.setup_lj_liquid()
         system.time = 0
         params = {
             'shear_velocity': 0.1,
@@ -694,14 +659,15 @@ class LeesEdwards(ut.TestCase):
             'shear_plane_normal': 0,
             'initial_pos_offset': 0.}
         system.lees_edwards.protocol = lees_edwards.LinearShear(**params)
+        system.integrator.run(0,recalc_forces=True)
         verify_lj_forces(system, 1E-10)
 
-        system.part[:].v=np.random.random((n,3))
+        system.part[:].v=np.random.random((len(system.part),3))
         # Integrate
-        for i in range(1000):
+        for i in range(100):
             e_kin=0.5*np.sum(system.part[:].v**2)
             system.part[:].v = system.part[:].v /np.sqrt(e_kin)
-            system.integrator.run(10)
+            system.integrator.run(50)
         f1=system.part[:].f
         p1 = system.part[:].pos
 
