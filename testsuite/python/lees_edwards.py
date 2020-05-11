@@ -566,7 +566,7 @@ class LeesEdwards(ut.TestCase):
         system = self.system
         system.cell_system.set_n_square(use_verlet_lists=False)
         # Parameters
-        n = 200 
+        n = 300 
         phi = 0.55
         sigma = 1.
         eps = 1
@@ -613,6 +613,7 @@ class LeesEdwards(ut.TestCase):
 
         system = self.system
         self.setup_lj_liquid()
+        print(system.cell_system.get_state())
 
         
         # Switch to constant offset protocol
@@ -664,10 +665,10 @@ class LeesEdwards(ut.TestCase):
 
         system.part[:].v=np.random.random((len(system.part),3))
         # Integrate
-        for i in range(100):
+        for i in range(40):
             e_kin=0.5*np.sum(system.part[:].v**2)
             system.part[:].v = system.part[:].v /np.sqrt(e_kin)
-            system.integrator.run(50)
+            system.integrator.run(20)
         f1=system.part[:].f
         p1 = system.part[:].pos_folded
 
@@ -696,10 +697,18 @@ class LeesEdwards(ut.TestCase):
         if n_nodes == 4:
             system.cell_system.node_grid = [1, 2, 2]
         
+        print(system.cell_system.get_state())
         system.cell_system.set_domain_decomposition(
             fully_connected=[True, False, False])
         
         system.integrator.run(0,recalc_forces=True)
+        p3=system.part[:].pos_folded
+        np.testing.assert_allclose(p1, p3)
+        
+        f3=system.part[:].f
+        np.testing.assert_allclose(f1,f3)
+
+
         verify_lj_forces(system, 1E-10)
 
         system.part.clear()
