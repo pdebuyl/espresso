@@ -183,8 +183,7 @@ void verlet_list_update_check(const Particle& p) {
     set_resort_particles(Cells::RESORT_LOCAL);
   }
 #else
-  if ((p.r.p - p.l.p_old).norm2() > skin2)
-    set_resort_particles(Cells::RESORT_LOCAL);
+  verlet_list_update_check(p);
 #endif
 }
 
@@ -729,11 +728,7 @@ void propagate_vel_pos(const ParticleRange &particles) {
 #endif
 
     /* Verlet criterion check*/
-    if (Utils::sqr(p.r.p[0] - p.l.p_old[0]) +
-            Utils::sqr(p.r.p[1] - p.l.p_old[1]) +
-            Utils::sqr(p.r.p[2] - p.l.p_old[2]) >
-        skin2)
-      set_resort_particles(Cells::RESORT_LOCAL);
+    verlet_list_update_check(p);
   }
 }
 
