@@ -669,11 +669,11 @@ class LeesEdwards(ut.TestCase):
             system.part[:].v = system.part[:].v /np.sqrt(e_kin)
             system.integrator.run(50)
         f1=system.part[:].f
-        p1 = system.part[:].pos
+        p1 = system.part[:].pos_folded
 
         # Switch to constant offset protocol
         new_params = params.copy()
-        new_offset = system.lees_edwards.pos_offset
+        new_offset = system.lees_edwards.pos_offset -system.time_step * system.lees_edwards.shear_velocity
 
         new_params.update(shear_velocity=0,
             initial_pos_offset=new_offset)
@@ -681,13 +681,11 @@ class LeesEdwards(ut.TestCase):
         system.lees_edwards.protocol=lees_edwards.LinearShear(**new_params)
         system.integrator.run(0,recalc_forces=True)
         f2=system.part[:].f
+        np.testing.assert_allclose(f1,f2)
 
-
-        p2 = system.part[:].pos
-
+        p2=system.part[:].pos_folded
         np.testing.assert_allclose(p1, p2)
 
-        np.testing.assert_allclose(f1,f2)
         # Verify lj forces on the particles.
         verify_lj_forces(system, 1E-10)
         
