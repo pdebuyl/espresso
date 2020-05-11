@@ -692,13 +692,12 @@ class LeesEdwards(ut.TestCase):
         n_nodes = self.system.cell_system.get_state()['n_nodes']
         if n_nodes == 2:
             system.cell_system.node_grid = [1, 1, 2]
-            system.cell_system.set_domain_decomposition(
-                fully_connected=[True, False, False])
         
         if n_nodes == 4:
             system.cell_system.node_grid = [1, 2, 2]
-            system.cell_system.set_domain_decomposition(
-                fully_connected=[True, False, False])
+        
+        system.cell_system.set_domain_decomposition(
+            fully_connected=[True, False, False])
         
         system.integrator.run(0,recalc_forces=True)
         verify_lj_forces(system, 1E-10)
