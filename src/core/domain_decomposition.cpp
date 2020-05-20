@@ -107,7 +107,7 @@ void dd_create_cell_grid(double range) {
       cell_range[i] = local_geo.length()[i] / dd.cell_grid[i];
 
       //THis allows shearing in the dd cell system on one node.
-      dd.cell_grid[1] = 1;
+      //dd.cell_grid[1] = 1;
 
       if (cell_range[i] < range) {
         /* ok, too many cells for this direction, set to minimum */
@@ -464,9 +464,9 @@ void dd_init_cell_interactions(const DomainDecomposition &dd,
         for (int i = 0; i < 3; i++) {
           if (dd.fully_connected[i]) {
             // Fully connected is only needed at the box surface
-            if (i==0 and (n!=start[1] or n!=end[1]-1) and (o!=start[2] or o!=end[2]-1)) continue;
-            if (i==1 and (m!=start[0] or m!=end[0]-1) and (o!=start[2] or o!=end[2]-1)) continue;
-            if (i==2 and (m!=start[0] or m!=end[0]-1) and (n!=start[1] or n!=end[1]-1)) continue;
+            //if (i==0 and (n!=start[1] or n!=end[1]-1) and (o!=start[2] or o!=end[2]-1)) continue;
+            //if (i==1 and (m!=start[0] or m!=end[0]-1) and (o!=start[2] or o!=end[2]-1)) continue;
+            //if (i==2 and (m!=start[0] or m!=end[0]-1) and (n!=start[1] or n!=end[1]-1)) continue;
             lower_index[i] = 0;
             upper_index[i] = global_size[i] - 1;
           }
@@ -741,17 +741,16 @@ void move_left_or_right(ParticleList &src, ParticleList &left,
 
     assert(local_particles[src.part[i].p.identity] == nullptr);
 
-    if (get_mi_coord(part.r.p[dir], local_geo.my_left()[dir],
-                     box_geo.length()[dir], box_geo.periodic(dir)) < 0.0) {
+    if (get_mi_vector(part.r.p, local_geo.my_left(),
+                     box_geo)[dir] < 0.0) {
       if (box_geo.periodic(dir) || (local_geo.boundary()[2 * dir] == 0)) {
 
         move_unindexed_particle(&left, &src, i);
         if (i < src.n)
           i--;
       }
-    } else if (get_mi_coord(part.r.p[dir], local_geo.my_right()[dir],
-                            box_geo.length()[dir],
-                            box_geo.periodic(dir)) >= 0.0) {
+    } else if (get_mi_vector(part.r.p, local_geo.my_right(),
+                            box_geo)[dir] >= 0.0) {
       if (box_geo.periodic(dir) || (local_geo.boundary()[2 * dir + 1] == 0)) {
 
         move_unindexed_particle(&right, &src, i);
