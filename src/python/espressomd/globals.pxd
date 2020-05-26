@@ -41,6 +41,7 @@ cdef extern from "global.hpp":
         int FIELD_NPTISO_G0
         int FIELD_NPTISO_GV
     int FIELD_MAX_OIF_OBJECTS
+    int FIELD_FULLY_CONNECTED
 
     void mpi_bcast_parameter(int p)
 

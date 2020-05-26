@@ -43,6 +43,7 @@ cdef class CellSystem:
         cell_structure.use_verlet_list = use_verlet_lists
         dd.fully_connected = fully_connected
         # grid.h::node_grid
+        mpi_bcast_parameter(FIELD_FULLY_CONNECTED)
         mpi_bcast_cell_structure(CELL_STRUCTURE_DOMDEC)
 
         handle_errors("Error while initializing the cell system.")
