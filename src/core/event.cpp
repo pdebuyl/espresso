@@ -168,7 +168,7 @@ void on_integration_start() {
   }
 
   if (cell_structure.type == CELL_STRUCTURE_DOMDEC) {
-    for (int i = 1; i < 3; i++) {
+    for (int i = 0; i < 3; i++) {
         if (!Utils::Mpi::all_compare(comm_cart, dd.fully_connected[i])) {
             runtimeErrorMsg() << "Nodes disagree about the fully connected property.";
             }
