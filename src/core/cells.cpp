@@ -91,9 +91,9 @@ std::vector<std::pair<int, int>> get_pairs(double distance) {
 
   auto pair_kernel = [&ret, &cutoff2](Particle const &p1, Particle const &p2,
                                       double dist2) {
-                         printf("Pos part 1 %f %f %f\n", p1.r.p[0], p1.r.p[1], p1.r.p[2]);
-                         printf("Pos part 2 %f %f %f\n", p2.r.p[0], p2.r.p[1], p2.r.p[2]);
-                         printf("Dist %f \n", dist2);
+                         //printf("Pos part 1 %f %f %f\n", p1.r.p[0], p1.r.p[1], p1.r.p[2]);
+                         //printf("Pos part 2 %f %f %f\n", p2.r.p[0], p2.r.p[1], p2.r.p[2]);
+                         //printf("Dist %f \n", dist2);
     if (dist2 < cutoff2) {
       ret.emplace_back(p1.p.identity, p2.p.identity);
     }
