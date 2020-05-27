@@ -31,6 +31,7 @@
 #include "communication.hpp"
 #include "cuda_init.hpp"
 #include "cuda_interface.hpp"
+#include "domain_decomposition.hpp"
 #include "energy.hpp"
 #include "errorhandling.hpp"
 #include "forces.hpp"
@@ -165,6 +166,14 @@ void on_integration_start() {
   if (!Utils::Mpi::all_compare(comm_cart, cell_structure.type)) {
     runtimeErrorMsg() << "Nodes disagree about cell system type.";
   }
+
+  if (cell_structure.type == CELL_STRUCTURE_DOMDEC) {
+    for (int i = 1; i < 3; i++) {
+        if (!Utils::Mpi::all_compare(comm_cart, dd.fully_connected[i])) {
+            runtimeErrorMsg() << "Nodes disagree about the fully connected property.";
+            }
+        }
+    }
 
   if (!Utils::Mpi::all_compare(comm_cart, cell_structure.use_verlet_list)) {
     runtimeErrorMsg() << "Nodes disagree about use of verlet lists.";
